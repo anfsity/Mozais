@@ -31,6 +31,20 @@ setting switches among those built-in values. `EditorStrings` is an
 abstraction, but `editorLocales` contains only English, and several greeter
 tooltips are inline English strings.
 
+Scene and theme are coupled in the runtime model too. `ThemeRegistry.resolveDocument`
+uses `SceneDocument.id` to select `default`, `fallback`, or `nocturne`; each
+`ThemeBundle` then owns both that document and theme tokens/registries. The
+Nocturne scene is generated into Dart and imported by its theme factory; its
+JSON also carries a `nocturne-depth` glass-panel variant. The greeter widget
+catalog separately branches on `theme.id == 'nocturne'` to change glass-panel
+rendering. A scene's identity therefore changes its appearance and renderer
+behavior even when its layout data is unchanged.
+
+`SceneNodeKind` also mixes semantic greeter components such as `accountPicker`
+with a visual primitive such as `glassPanel`, while `properties` is an
+untyped string map. That makes scene files depend on implementation details
+and allows theme-specific variants to leak into component rendering.
+
 The workspace composition, document/file operations, selection and preview
 mode currently meet in `EditorScreen`, `SceneEditorController`, and
 `ScenePreview`. `EditorScreen` owns pane state, file dialogs, close handling,
@@ -60,19 +74,22 @@ EditorApp
   |
   +-- LocalizationCatalog -> locale resource bundle
   +-- EditorThemeCatalog  -> editor palette data
-  +-- ThemeRepository     -> validated scene theme data
-  |                          + compiled ThemeRendererRegistry
-  |                          + compiled MotionRegistry
+  +-- SceneRepository     -> validated SceneDocument
+  +-- ThemeRepository     -> validated ThemeDefinition
+  +-- ComponentRegistry   -> compiled component implementations
+  +-- MotionRegistry      -> compiled motion algorithms
   +-- EditorWorkspace
         +-- WorkspaceState: selection, predicates, panes, preview mode
-        +-- DocumentSession: document, path, load/save, dirty state
+        +-- DocumentSession: scene, path, load/save, dirty state
+        +-- SceneProfile: selected scene id + theme id
         +-- NodeList: node identity/order projection
-        +-- SceneCanvas: document projection + transient interaction state
-        +-- Inspector: selected-node/document projections
+        +-- SceneCanvas: scene + theme + transient interaction state
+        +-- Inspector: selected scene/theme projections
         +-- Status: file-operation projection
 
 GreeterRuntime
-  ThemeRepository -> ThemeRendererRegistry -> SceneRuntime
+  SceneProfile -> SceneRepository + ThemeRepository
+              -> ComponentRegistry + MotionRegistry -> SceneRuntime
 ```
 
 The app composition root wires concrete services. `DocumentSession` owns
@@ -80,39 +97,116 @@ persisted document edits and file operations. `WorkspaceState` owns selection,
 active predicates, pane layout, and preview mode. The canvas owns pointer
 sessions and temporary projections. Views subscribe to the smallest data
 projection they display; no drag event updates persisted document state, dirty
-state, node list, or inspector.
+state, node list, or inspector. The scene and theme are selected independently;
+the profile is the explicit place that combines them.
 
 Do not split these owners into interfaces without a second implementation or a
 real replacement need. The target is explicit ownership and narrow data flow,
 not a service locator or a generic editor framework.
 
-## Runtime Theme Loading
+## Package Boundaries
 
-Separate theme data from executable rendering behavior:
+Keep serialized data independent from Flutter and greeter behavior:
 
-- A versioned theme package contains a manifest, `SceneDocument`, palette and
-  token data, and assets. The editor can open a package from disk; the greeter
-  can enumerate trusted built-in and installed package directories.
-- A loader validates the manifest and scene schema, resolves assets relative
-  to the package root, and reports load errors before replacing the active
-  theme.
-- The runtime keeps a compiled registry for node kinds, backgrounds, and
-  motion presets. Theme data selects registered kinds; it does not load or
-  execute Dart code.
-- Editor preview and greeter runtime consume the same validated theme model
-  and renderer registry. The editor must not invent a parallel interpretation
-  of the theme package.
-- Keep a minimal embedded fallback theme for invalid or missing packages.
+```text
+mozais_scene_schema     scene ids, component refs, layout, conditions, codec
+mozais_theme_schema     theme ids, tokens, style data, codec
+shared repositories     read, validate, and resolve installed scene/theme data
+mozais_scene            Flutter layout, transform, visibility, motion runtime
+mozais_greeter_ui       feature adapter and compiled greeter component catalog
+mozais_scene_editor     document sessions, canvas tools, inspector, file UI
+```
+
+`mozais_scene_schema` already provides a Flutter-free scene model and codec.
+The target adds a similarly platform-neutral theme schema. Repositories own
+filesystem and package-root asset resolution; neither schema package imports
+Flutter, the greeter feature, or editor widgets. The greeter app and editor use
+the same repositories, while the editor remains independent of the app shell.
+
+The runtime may build an ephemeral resolved render context from a scene, a
+theme, and the compiled catalogs. That object is an adapter for rendering, not
+the persisted source of either document. A serialized `ThemeDefinition`
+contains data and registered ids, never Flutter `ThemeData`, renderer
+instances, callbacks, or widget factories.
+
+## Scene and Theme Boundaries
+
+Separate scene composition, theme presentation, and executable behavior.
+
+**Scene data** describes registered component identity, typed component data,
+normalized placement, ordering, focus order, visibility conditions, and
+semantic actions. It has its own id and version. A component id describes a
+stable role such as a credential field or visual surface; it does not name a
+theme-specific implementation. Scene data does not select colors, typography,
+a theme package, or a theme-specific renderer implementation. Replace the
+open-ended string `properties` map with component data validated by its
+registered schema.
+
+**Theme data** describes design tokens, semantic style definitions, surface
+shapes, typography, background treatment/assets, and named motion parameters.
+Scene components refer to semantic style roles; the theme resolves those roles
+to visual values. Background colors, blur/scrim treatment, and surface-depth
+styles live here rather than in a scene-specific theme branch. A scene can be
+paired with different themes without editing the scene file. Theme data is
+platform-neutral; a compiled adapter converts it to Flutter objects.
+
+The intended pairing is explicit:
+
+```text
+scenes/greeter-default/scene.json       id: greeter-default
+themes/nocturne/theme.json              id: nocturne
+profiles/nocturne-login.json            scene: greeter-default
+                                        theme: nocturne
+```
+
+`SceneRuntime` receives the selected scene and resolved theme separately. If
+an implementation needs a combined render context, it is created at runtime
+from those inputs and is never serialized as the owner of either one.
+
+**Component and motion registries** remain compiled code. Scene data names a
+supported component, and theme data supplies its presentation values and
+supported visual parameters. Registries implement behavior and rendering;
+they do not contain a switch on a theme name. A new executable component still
+needs a reviewed implementation, but a new composition, palette, or supported
+surface treatment does not.
+
+- A versioned scene package contains a `SceneDocument` and any scene-owned
+  content assets. A separate versioned theme package contains its manifest,
+  `ThemeDefinition`, palette/style data, and theme-owned assets. The editor can
+  open either independently; the greeter can enumerate trusted installed
+  packages.
+- `SceneRepository` loads scene packages. `ThemeRepository` loads theme
+  packages. Each validates its own versioned data and reports errors at that
+  boundary.
+- The composition profile pairs scene and theme identifiers. The runtime
+  resolves both, validates references between them, then constructs a
+  render-only context from the two data models and the compiled registries.
+- Assets resolve relative to the package that owns them. A scene may refer to
+  an explicit content asset, but it cannot infer a theme from its id or reach
+  into another package by path. Background appearance belongs to the theme;
+  scene-specific media must be an explicit profile or scene-package reference.
+- Keep a minimal embedded scene and theme available for recovery if loading
+  fails.
 
 This supports installing and switching declarative themes without rebuilding
-the application. A theme that introduces a new executable widget or renderer
-still requires a compiled registry implementation. Arbitrary Dart plugins are
-outside this design.
+the application, and pairing one scene with multiple themes. A theme that
+introduces a new executable component or renderer still requires a compiled
+registry implementation. Arbitrary Dart plugins are outside this design.
 
-`MOZAIS_THEME` can remain a startup default during migration, but it should
-resolve a theme identifier through the repository rather than select a
-hard-coded factory. The active theme can then change without restarting the
-greeter if the runtime safely rebuilds its scene.
+`MOZAIS_THEME` and a new scene selection can remain startup defaults during
+migration, but both should resolve data through their repositories. A profile
+may pair the existing login composition with the Nocturne theme; the scene id
+must not be `nocturne` just to select that appearance. Nocturne's color, shape,
+background, and depth treatment move to data-driven style values. The special
+`theme.id == 'nocturne'` rendering branch is removed. Switching the theme
+should preserve the existing greeter feature state while rebuilding the scene
+presentation.
+
+The current generated `*.scene.g.dart` documents cannot be the runtime source
+of truth for dynamically installed scenes. Built-in and user-installed scene
+files should use the same validated decoder. Code generation may remain as a
+development-time validation aid only if it does not create a second runtime
+loading path.
 
 ## Locale Resources
 
@@ -208,10 +302,10 @@ The implementation is ready when:
 
 1. Trace the current application flows and capture actual editor pointer
    gestures as a baseline before changing canvas ownership.
-2. Define the theme package and locale resource contracts, including whether
-   user-installed packs must work without rebuilding the application.
-3. Introduce one validated theme loader shared by editor preview and greeter
-   runtime, with compiled registries and a fallback theme.
+2. Define independent scene, theme, profile, and locale resource contracts,
+   including whether user-installed packs must work without rebuilding.
+3. Introduce separate validated scene/theme repositories and an explicit
+   profile resolver shared by editor preview and greeter runtime.
 4. Move locale-specific text to resource bundles and complete the switch across
    editor and greeter controls.
 5. Separate document/file ownership, workspace state, and canvas interaction

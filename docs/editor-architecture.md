@@ -1,21 +1,23 @@
-# Scene Editor Architecture Proposal
+# Theme Builder and Scene Editor Architecture Proposal
 
 Status: proposal for review. This covers editor ownership, theme and locale
 loading, and canvas performance. It does not change runtime behavior.
 
 ## Goals
 
-- Keep `SceneDocument` as the persisted source of truth and continue using the
-  real scene runtime and widget catalog for previews.
+- Keep the theme project as the authoring source of truth and use the same
+  theme runtime for previews and the greeter.
 - Keep pointer-move state transient until an edit is committed.
 - Make a drag update the selected visual region without rebuilding unrelated
   editor panes or repainting unchanged scene regions.
 - Preserve Flutter input, focus, keyboard navigation, and accessibility.
 - Base performance decisions on measured pointer interactions.
-- Let users install and switch scene themes and translation resources without
-  editing Dart source.
-- Keep executable widget renderers and interaction behavior in reviewed,
-  compiled code.
+- Let users author, build, preview, package, and install themes without editing
+  the Mozais application source.
+- Keep theme scenes, component templates, styles, motion, locale resources, and
+  assets inside one independently versioned theme project.
+- Keep login behavior behind a small host capability API; themes describe
+  presentation and bind to those capabilities through data.
 
 ## Current State
 
@@ -68,154 +70,169 @@ start with a real gesture trace in both Outline and Real modes.
 
 ## Target Ownership
 
-```text
-EditorApp
-  settings, active locale, editor chrome theme
-  |
-  +-- LocalizationCatalog -> locale resource bundle
-  +-- EditorThemeCatalog  -> editor palette data
-  +-- SceneRepository     -> validated SceneDocument
-  +-- ThemeRepository     -> validated ThemeDefinition
-  +-- ComponentRegistry   -> compiled component implementations
-  +-- MotionRegistry      -> compiled motion algorithms
-  +-- EditorWorkspace
-        +-- WorkspaceState: selection, predicates, panes, preview mode
-        +-- DocumentSession: scene, path, load/save, dirty state
-        +-- SceneProfile: selected scene id + theme id
-        +-- NodeList: node identity/order projection
-        +-- SceneCanvas: scene + theme + transient interaction state
-        +-- Inspector: selected scene/theme projections
-        +-- Status: file-operation projection
+The product direction is Hugo-like: theme authors own independent theme
+projects, while Mozais owns the format, builder, editor, validator, and runtime.
+The theme is builder input, not a branch in the Mozais source tree. Unlike a
+static site generator, the output still drives an interactive login greeter,
+so runtime behavior is exposed through the host capability API.
 
-GreeterRuntime
-  SceneProfile -> SceneRepository + ThemeRepository
-              -> ComponentRegistry + MotionRegistry -> SceneRuntime
+```text
+ThemeProject (author source)
+  manifest, scenes, component templates, tokens, motion, locales, assets
+  |
+  v
+mozais_theme_builder -> validate -> compile declarative IR -> .moztheme package
+                                                   |
+                                                   v
+ThemeLoader -> ThemeRuntime -> generic primitive renderer
+                         ^
+                         |
+GreeterHost -> read-only state + allowlisted actions + secure input handles
+
+ThemeStudio
+  project session, file operations, build diagnostics, live preview
+  +-- WorkspaceState: selection, panes, preview mode
+  +-- ProjectSession: source paths, save, dirty state
+  +-- SceneCanvas: compiled theme + transient interaction state
+  +-- Inspector: selected scene/component/template projections
+  +-- Status: file and build diagnostics
 ```
 
-The app composition root wires concrete services. `DocumentSession` owns
-persisted document edits and file operations. `WorkspaceState` owns selection,
-active predicates, pane layout, and preview mode. The canvas owns pointer
-sessions and temporary projections. Views subscribe to the smallest data
-projection they display; no drag event updates persisted document state, dirty
-state, node list, or inspector. The scene and theme are selected independently;
-the profile is the explicit place that combines them.
+The theme project is the authoring and persistence boundary. Its scenes and
+component templates are package-local; there is no global scene catalog that
+silently pairs a scene id with a theme implementation. The builder is the
+single path from source files to a validated runtime package. ThemeStudio and
+the greeter preview the same compiled representation. During canvas gestures,
+the canvas owns temporary projections; pointer-move does not write source,
+mark the project dirty, or notify unrelated editor panes.
 
 Do not split these owners into interfaces without a second implementation or a
-real replacement need. The target is explicit ownership and narrow data flow,
-not a service locator or a generic editor framework.
+real replacement need. The host capability API is a deliberate product
+boundary, not a generic plugin service locator.
 
 ## Package Boundaries
 
-Keep serialized data independent from Flutter and greeter behavior:
+Keep the theme source format and builder independent from Flutter widgets and
+greeter behavior:
 
 ```text
-mozais_scene_schema     scene ids, component refs, layout, conditions, codec
-mozais_theme_schema     theme ids, tokens, style data, codec
-shared repositories     read, validate, and resolve installed scene/theme data
-mozais_scene            Flutter layout, transform, visibility, motion runtime
-mozais_greeter_ui       feature adapter and compiled greeter component catalog
-mozais_scene_editor     document sessions, canvas tools, inspector, file UI
+mozais_scene_schema       scene/layout/condition data and codec
+mozais_theme_schema       manifest/component-template/theme data and codec
+mozais_theme_builder      source validation, asset resolution, IR/package output
+mozais_theme_runtime      package loader and generic Flutter primitive renderer
+mozais_greeter_ui         host state projection and allowlisted action adapter
+mozais_scene_editor       theme project sessions, canvas tools, inspector, UI
 ```
 
-`mozais_scene_schema` already provides a Flutter-free scene model and codec.
-The target adds a similarly platform-neutral theme schema. Repositories own
-filesystem and package-root asset resolution; neither schema package imports
-Flutter, the greeter feature, or editor widgets. The greeter app and editor use
-the same repositories, while the editor remains independent of the app shell.
+Both schema packages remain platform-neutral. The builder reads a theme source
+tree, validates it, resolves only package-local references, and emits a
+versioned `.moztheme` artifact containing the compiled declarative IR and its
+resources. The loader accepts that artifact in both the greeter and the
+editor. Neither schema nor builder imports Flutter, greeter state, or editor
+widgets. The editor edits the project source and previews the builder output;
+the greeter never imports a theme's Dart source.
 
-The runtime may build an ephemeral resolved render context from a scene, a
-theme, and the compiled catalogs. That object is an adapter for rendering, not
-the persisted source of either document. A serialized `ThemeDefinition`
-contains data and registered ids, never Flutter `ThemeData`, renderer
-instances, callbacks, or widget factories.
+The runtime resolves a package entrypoint and a `GreeterHost` capability
+snapshot, then interprets the package IR. No serialized theme field contains
+Flutter `ThemeData`, callbacks, widget factories, arbitrary expressions, or
+references to another installed theme.
 
 ## Scene and Theme Boundaries
 
-Separate scene composition, theme presentation, and executable behavior.
+Each theme is a self-contained project. It owns one or more scenes, all
+component templates used by those scenes, style tokens, supported motion
+parameters, locale resources, and assets. A scene is selected within its theme
+package; it is not a global document that acquires appearance from a theme id.
+Cross-theme imports and shared visual component catalogs are not part of the
+initial contract. Commonality belongs in the host's stable data format and
+generic renderer primitives, not in theme-specific branches in application
+code.
 
-**Scene data** describes registered component identity, typed component data,
-normalized placement, ordering, focus order, visibility conditions, and
-semantic actions. It has its own id and version. A component id describes a
-stable role such as a credential field or visual surface; it does not name a
-theme-specific implementation. Scene data does not select colors, typography,
-a theme package, or a theme-specific renderer implementation. Replace the
-open-ended string `properties` map with component data validated by its
-registered schema.
+**Scene data** describes references to component templates defined by the same
+theme, placement, ordering, focus order, visibility conditions, and bindings to
+host capabilities. **Component templates** describe their visual tree using
+the runtime's generic primitives, typed parameters, style roles, and event
+bindings. The template model needs composition, slots, repeated data, state
+conditions, and supported transitions so a theme can lay out changing account,
+session, and authentication state. Their ids are local to the package. A theme
+author can define and reuse components without adding a case to a Mozais
+`WidgetCatalog`.
 
-**Theme data** describes design tokens, semantic style definitions, surface
-shapes, typography, background treatment/assets, and named motion parameters.
-Scene components refer to semantic style roles; the theme resolves those roles
-to visual values. Background colors, blur/scrim treatment, and surface-depth
-styles live here rather than in a scene-specific theme branch. A scene can be
-paired with different themes without editing the scene file. Theme data is
-platform-neutral; a compiled adapter converts it to Flutter objects.
+Theme-local data describes design tokens, style roles, typography, surface
+shapes, background treatment/assets, motion parameters, and localized copy.
+These values resolve within the package. Background effects and surface depth
+are authored by the theme; the runtime has no `if (theme.id == ...)` rendering
+logic.
 
-The intended pairing is explicit:
+An authoring project has a package-local entrypoint, for example:
 
 ```text
-scenes/greeter-default/scene.json       id: greeter-default
-themes/nocturne/theme.json              id: nocturne
-profiles/nocturne-login.json            scene: greeter-default
-                                        theme: nocturne
+nocturne/
+  mozais.yaml
+  scenes/login.yaml
+  components/glass-panel.yaml
+  components/credential-form.yaml
+  tokens.yaml
+  motion.yaml
+  locales/en.json
+  locales/zh-CN.json
+  assets/...
 ```
 
-`SceneRuntime` receives the selected scene and resolved theme separately. If
-an implementation needs a combined render context, it is created at runtime
-from those inputs and is never serialized as the owner of either one.
+`mozais.yaml` declares package id, package version, supported Mozais host API
+range, and entrypoints. The runtime selects a package and an entrypoint from
+host settings. Nocturne becomes an ordinary project that can be built and
+installed like any other theme; its id is metadata, never a code path.
 
-**Component and motion registries** remain compiled code. Scene data names a
-supported component, and theme data supplies its presentation values and
-supported visual parameters. Registries implement behavior and rendering;
-they do not contain a switch on a theme name. A new executable component still
-needs a reviewed implementation, but a new composition, palette, or supported
-surface treatment does not.
+The host exposes a narrow, versioned **capability API**. It provides semantic
+state projections such as account/session summaries and authentication status,
+secure input handles for credential prompts, and allowlisted actions such as
+select account, submit/cancel authentication, select session, or request a
+power operation. Themes can bind visual templates to these values and events;
+they do not receive Rust services, D-Bus objects, arbitrary backend state, or
+the ability to invoke unlisted operations. Secret input remains owned by the
+host control path rather than being exposed as ordinary theme-readable text.
 
-- A versioned scene package contains a `SceneDocument` and any scene-owned
-  content assets. A separate versioned theme package contains its manifest,
-  `ThemeDefinition`, palette/style data, and theme-owned assets. The editor can
-  open either independently; the greeter can enumerate trusted installed
-  packages.
-- `SceneRepository` loads scene packages. `ThemeRepository` loads theme
-  packages. Each validates its own versioned data and reports errors at that
-  boundary.
-- The composition profile pairs scene and theme identifiers. The runtime
-  resolves both, validates references between them, then constructs a
-  render-only context from the two data models and the compiled registries.
-- Assets resolve relative to the package that owns them. A scene may refer to
-  an explicit content asset, but it cannot infer a theme from its id or reach
-  into another package by path. Background appearance belongs to the theme;
-  scene-specific media must be an explicit profile or scene-package reference.
-- Keep a minimal embedded scene and theme available for recovery if loading
-  fails.
+`mozais_theme_builder` provides `validate`, `build`, and `package` operations.
+Validation checks schema and host API compatibility, local component and style
+references, locale keys, asset paths, and resource limits. Build converts the
+editable source into a deterministic, versioned declarative IR. Package emits
+an installable `.moztheme` artifact with a manifest, IR, and package-local
+resources. Builder diagnostics point to source paths and fields so the editor
+can show them beside the relevant control. The embedded recovery theme is
+built from the same format and loaded through the same runtime path.
 
-This supports installing and switching declarative themes without rebuilding
-the application, and pairing one scene with multiple themes. A theme that
-introduces a new executable component or renderer still requires a compiled
-registry implementation. Arbitrary Dart plugins are outside this design.
+This supports authoring and installing declarative themes without rebuilding
+the greeter. A theme can define new compositions and components from the
+generic primitive vocabulary. It cannot ship arbitrary Flutter/Dart widget
+code: Flutter AOT does not load new Dart libraries into an installed host
+process. If future themes need behavior outside the declarative capability
+model, that is a separate extension project requiring either a host rebuild or
+a deliberately designed isolated plugin process; it must not be implied by the
+theme package format.
 
-`MOZAIS_THEME` and a new scene selection can remain startup defaults during
-migration, but both should resolve data through their repositories. A profile
-may pair the existing login composition with the Nocturne theme; the scene id
-must not be `nocturne` just to select that appearance. Nocturne's color, shape,
-background, and depth treatment move to data-driven style values. The special
-`theme.id == 'nocturne'` rendering branch is removed. Switching the theme
-should preserve the existing greeter feature state while rebuilding the scene
-presentation.
+`MOZAIS_THEME` can remain a startup selection during migration, but it resolves
+an installed package through the loader rather than a static Dart registry.
+Switching packages preserves the greeter feature state while replacing the
+theme presentation. Default, fallback, and Nocturne should all be ordinary
+theme projects; only the minimal recovery artifact needs to ship with the host.
 
-The current generated `*.scene.g.dart` documents cannot be the runtime source
-of truth for dynamically installed scenes. Built-in and user-installed scene
-files should use the same validated decoder. Code generation may remain as a
-development-time validation aid only if it does not create a second runtime
-loading path.
+The current generated `*.scene.g.dart` files are not a suitable runtime source
+for user-installed themes. `mozais_scene_codegen` generates Dart and is not the
+user-facing theme builder. The theme builder replaces that runtime path:
+built-in and user-authored projects pass through the same validator and produce
+the same IR format. Build-time code generation may remain an implementation
+detail only if it produces this same package and does not create a second
+runtime path.
 
 ## Locale Resources
 
-Replace per-language Dart string implementations with locale resource bundles.
-All editor and greeter copy, including tooltips and operation errors, uses
-message keys and parameterized messages. The app loads the selected locale
-bundle, falls back to the default locale for missing keys, and notifies the
-relevant widget subtree when the locale changes. The persisted locale setting
-stores a locale tag, not an implementation enum.
+Theme-visible copy, including component labels and prompts, lives in that
+theme's locale resources. Builder diagnostics and editor chrome have separate
+locale resources owned by the tooling. All use message keys and parameterized
+messages; theme text falls back to that theme's default locale for missing
+keys and notifies only the affected widget subtree. User theme translations
+never require editing Dart source.
 
 Choose a resource format that supports parameters and plural rules before
 implementation. Bundled locales should work offline; an optional user locale
@@ -302,14 +319,14 @@ The implementation is ready when:
 
 1. Trace the current application flows and capture actual editor pointer
    gestures as a baseline before changing canvas ownership.
-2. Define independent scene, theme, profile, and locale resource contracts,
-   including whether user-installed packs must work without rebuilding.
-3. Introduce separate validated scene/theme repositories and an explicit
-   profile resolver shared by editor preview and greeter runtime.
-4. Move locale-specific text to resource bundles and complete the switch across
-   editor and greeter controls.
-5. Separate document/file ownership, workspace state, and canvas interaction
-   based on those explicit responsibilities.
+2. Define the theme project format, generic component primitive vocabulary,
+   host capability API, package compatibility rules, and builder output.
+3. Build the validator/compiler/packager and load the same `.moztheme` output
+   in editor preview and greeter runtime.
+4. Move theme-visible strings, tokens, motion, and assets into package-local
+   resources; keep editor chrome localization separate.
+5. Replace the scene-only editor workspace with a theme project session while
+   keeping source edits and canvas gesture state independently owned.
 6. Implement the transient canvas edit lifecycle and selected-node rendering.
 7. Fix the reference-size field layout and dropdown focus styling, then verify
    them at the inspector's minimum width and with keyboard navigation.

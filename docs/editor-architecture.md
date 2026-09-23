@@ -1,7 +1,7 @@
 # Scene Editor Architecture Proposal
 
-Status: proposal for review. This describes a direction for the editor canvas;
-it does not change the greeter runtime or commit to a particular rendering API.
+Status: proposal for review. This covers editor ownership, theme and locale
+loading, and canvas performance. It does not change runtime behavior.
 
 ## Goals
 
@@ -12,12 +12,33 @@ it does not change the greeter runtime or commit to a particular rendering API.
   editor panes or repainting unchanged scene regions.
 - Preserve Flutter input, focus, keyboard navigation, and accessibility.
 - Base performance decisions on measured pointer interactions.
+- Let users install and switch scene themes and translation resources without
+  editing Dart source.
+- Keep executable widget renderers and interaction behavior in reviewed,
+  compiled code.
 
 ## Current State
 
 The workspace already scopes some updates: the node list, preview, status bar,
 and inspector have separate listenables. The scene runtime also places
 repaint boundaries around the background and each node.
+
+The current theme and locale paths are still code-owned. The greeter selects
+`MOZAIS_THEME` during startup from a static registry, and its theme factories
+combine generated scene data with compiled renderer and motion registries. The
+editor's own color palettes are constants indexed by `EditorThemeId`; the
+setting switches among those built-in values. `EditorStrings` is an
+abstraction, but `editorLocales` contains only English, and several greeter
+tooltips are inline English strings.
+
+The workspace composition, document/file operations, selection and preview
+mode currently meet in `EditorScreen`, `SceneEditorController`, and
+`ScenePreview`. `EditorScreen` owns pane state, file dialogs, close handling,
+and preview mode. `SceneEditorController` owns document mutation, JSON file
+operations, and asset copying. `ScenePreview` owns runtime construction,
+theme caching, async background-seed lookup, preview-mode rendering, and
+selection overlay composition. Separate listenables reduce some rebuilds, but
+these classes still combine unrelated reasons to change.
 
 During a canvas drag, `_SelectionOverlayState` stores a temporary rect or
 transform and calls `setState`. The overlay's `CustomPaint` fills the complete
@@ -31,29 +52,82 @@ These facts do not establish whether reported frame drops come from widget
 build/layout, paint/raster, or a combination. The next implementation should
 start with a real gesture trace in both Outline and Real modes.
 
-## Ownership
+## Target Ownership
 
 ```text
-EditorWorkspace
-  pane sizes, collapse state, preview mode, routes
+EditorApp
+  settings, active locale, editor chrome theme
   |
-  +-- NodeList      listens to node identity/order and selection
-  +-- SceneCanvas   listens to document presentation and selection
-  |     +-- Scene content: background and scene nodes
-  |     +-- Live edit projection: selected node during a gesture
-  |     +-- Input surface: hit testing and pointer lifecycle
-  |     +-- Selection tools: outline, handles, cursor affordances
-  +-- Inspector     listens to the selected document projection
-  +-- Status        listens to file operations and dirty state
+  +-- LocalizationCatalog -> locale resource bundle
+  +-- EditorThemeCatalog  -> editor palette data
+  +-- ThemeRepository     -> validated scene theme data
+  |                          + compiled ThemeRendererRegistry
+  |                          + compiled MotionRegistry
+  +-- EditorWorkspace
+        +-- WorkspaceState: selection, predicates, panes, preview mode
+        +-- DocumentSession: document, path, load/save, dirty state
+        +-- NodeList: node identity/order projection
+        +-- SceneCanvas: document projection + transient interaction state
+        +-- Inspector: selected-node/document projections
+        +-- Status: file-operation projection
 
-SceneEditorController
-  persisted document, selection, predicates, file operations, dirty state
+GreeterRuntime
+  ThemeRepository -> ThemeRendererRegistry -> SceneRuntime
 ```
 
-The workspace owns layout changes, not canvas pointer motion. The document
-controller owns persisted edits and file state. The canvas owns the active
-pointer session and its temporary edit projection. No drag event should update
-the dirty flag, serialized document, node list, or inspector.
+The app composition root wires concrete services. `DocumentSession` owns
+persisted document edits and file operations. `WorkspaceState` owns selection,
+active predicates, pane layout, and preview mode. The canvas owns pointer
+sessions and temporary projections. Views subscribe to the smallest data
+projection they display; no drag event updates persisted document state, dirty
+state, node list, or inspector.
+
+Do not split these owners into interfaces without a second implementation or a
+real replacement need. The target is explicit ownership and narrow data flow,
+not a service locator or a generic editor framework.
+
+## Runtime Theme Loading
+
+Separate theme data from executable rendering behavior:
+
+- A versioned theme package contains a manifest, `SceneDocument`, palette and
+  token data, and assets. The editor can open a package from disk; the greeter
+  can enumerate trusted built-in and installed package directories.
+- A loader validates the manifest and scene schema, resolves assets relative
+  to the package root, and reports load errors before replacing the active
+  theme.
+- The runtime keeps a compiled registry for node kinds, backgrounds, and
+  motion presets. Theme data selects registered kinds; it does not load or
+  execute Dart code.
+- Editor preview and greeter runtime consume the same validated theme model
+  and renderer registry. The editor must not invent a parallel interpretation
+  of the theme package.
+- Keep a minimal embedded fallback theme for invalid or missing packages.
+
+This supports installing and switching declarative themes without rebuilding
+the application. A theme that introduces a new executable widget or renderer
+still requires a compiled registry implementation. Arbitrary Dart plugins are
+outside this design.
+
+`MOZAIS_THEME` can remain a startup default during migration, but it should
+resolve a theme identifier through the repository rather than select a
+hard-coded factory. The active theme can then change without restarting the
+greeter if the runtime safely rebuilds its scene.
+
+## Locale Resources
+
+Replace per-language Dart string implementations with locale resource bundles.
+All editor and greeter copy, including tooltips and operation errors, uses
+message keys and parameterized messages. The app loads the selected locale
+bundle, falls back to the default locale for missing keys, and notifies the
+relevant widget subtree when the locale changes. The persisted locale setting
+stores a locale tag, not an implementation enum.
+
+Choose a resource format that supports parameters and plural rules before
+implementation. Bundled locales should work offline; an optional user locale
+directory can add or override text without loading executable code. Missing or
+invalid bundles must fall back with a visible diagnostic rather than leave
+literal keys in the UI.
 
 ## Canvas Interaction
 
@@ -132,15 +206,23 @@ The implementation is ready when:
 
 ## Work Sequence
 
-1. Add real pointer gestures to the editor performance scenario and record a
-   baseline before changing canvas ownership.
-2. Introduce transient canvas edit state and the single-commit gesture
-   lifecycle.
-3. Render the selected node from the live projection and separate the full-size
-   hit surface from bounded selection painting.
-4. Narrow pane subscriptions only where the trace shows unrelated work.
-5. Fix the reference-size field layout and dropdown focus styling, then verify
+1. Trace the current application flows and capture actual editor pointer
+   gestures as a baseline before changing canvas ownership.
+2. Define the theme package and locale resource contracts, including whether
+   user-installed packs must work without rebuilding the application.
+3. Introduce one validated theme loader shared by editor preview and greeter
+   runtime, with compiled registries and a fallback theme.
+4. Move locale-specific text to resource bundles and complete the switch across
+   editor and greeter controls.
+5. Separate document/file ownership, workspace state, and canvas interaction
+   based on those explicit responsibilities.
+6. Implement the transient canvas edit lifecycle and selected-node rendering.
+7. Fix the reference-size field layout and dropdown focus styling, then verify
    them at the inspector's minimum width and with keyboard navigation.
+
+Architecture comments should explain invariants and ownership decisions that
+are not clear from types and names. They are not a substitute for keeping file
+and state responsibilities narrow.
 
 Login-manager installation and SDDM migration are separate deployment work.
 They should be designed for an explicitly supported distribution and validated

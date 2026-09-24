@@ -4,18 +4,6 @@ import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 import 'package:mozais_scene/mozais_scene.dart';
 
 void main() {
-  test('resolves the imported document theme family by id', () {
-    final document = _document('nocturne');
-
-    final theme = ThemeRegistry.resolveDocument(
-      document,
-      seed: const Color(0xffd14a7a),
-    );
-
-    expect(theme.id, ThemeRegistry.nocturneThemeName);
-    expect(theme.document, same(document));
-  });
-
   test('builds the default palette from its extracted seed', () {
     final document = _document(ThemeRegistry.defaultThemeName);
     final warm = ThemeRegistry.resolveDocument(

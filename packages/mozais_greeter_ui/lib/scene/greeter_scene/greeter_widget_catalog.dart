@@ -300,7 +300,6 @@ class _GlassPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(theme.tokens.panelRadius);
-    final isNocturne = theme.id == 'nocturne';
     final scheme = Theme.of(context).colorScheme;
     final panel = Material(
       color: scheme.surfaceContainerHigh,
@@ -314,28 +313,6 @@ class _GlassPanel extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: child,
     );
-
-    if (isNocturne) {
-      return Stack(
-        clipBehavior: Clip.none,
-        fit: StackFit.expand,
-        children: [
-          Transform.translate(
-            offset: const Offset(8, 10),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: scheme.primary.withValues(alpha: 0.2),
-                borderRadius: radius,
-                border: Border.all(
-                  color: scheme.primary.withValues(alpha: 0.18),
-                ),
-              ),
-            ),
-          ),
-          panel,
-        ],
-      );
-    }
     return panel;
   }
 }

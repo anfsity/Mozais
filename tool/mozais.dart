@@ -1,0 +1,170 @@
+import 'dart:io';
+
+import 'src/command_plans.dart';
+import 'src/run_report.dart';
+
+const _commands = {'verify', 'verify-perf', 'generate-scenes', 'trace-perf'};
+const _minimumPerfCycles = 3;
+
+Future<void> main(List<String> arguments) async {
+  try {
+    if (arguments.isEmpty || arguments.first == '--help') {
+      _writeUsage();
+      return;
+    }
+
+    final command = arguments.first;
+    if (!_commands.contains(command)) {
+      throw FormatException('Unknown command: $command');
+    }
+    if (arguments
+        .skip(1)
+        .any((argument) => argument == '-h' || argument == '--help')) {
+      _writeUsage(command);
+      return;
+    }
+
+    final options = _parseOptions(command, arguments.skip(1).toList());
+    final repoRoot = _findRepoRoot();
+    final runDirectory =
+        'build/tool/runs/${DateTime.now().toUtc().microsecondsSinceEpoch}-$pid';
+    exitCode = await runDevCommand(
+      command: command,
+      format: options.format,
+      reportPath: options.reportPath,
+      repoRoot: repoRoot,
+      runDirectory: runDirectory,
+      steps: buildStepsFor(command, options.cycles, repoRoot, runDirectory),
+      artifactPaths: artifactPathsFor(command, runDirectory),
+    );
+  } on FormatException catch (error) {
+    stderr.writeln(error.message);
+    _writeUsage();
+    exitCode = 2;
+  } catch (error) {
+    stderr.writeln('Mozais tool failed: $error');
+    exitCode = 1;
+  }
+}
+
+void _writeUsage([String? command]) {
+  if (command == null) {
+    stdout.writeln('''Usage: fvm dart run tool/mozais.dart <command> [options]
+
+Commands:
+  verify          Run the full backend, Dart, Flutter, and D-Bus verification.
+  verify-perf     Run the Linux profile performance gate.
+  generate-scenes Generate generated theme scene code.
+  trace-perf      Capture and summarize a Flutter performance timeline.
+
+Options:
+  --format text|json  Select console output format (default: text).
+  --report PATH       Write the JSON run report to PATH.
+  --cycles COUNT      Measurement cycles for verify-perf (minimum: 3).
+  -h, --help          Show command help.''');
+    return;
+  }
+
+  stdout.writeln('Usage: fvm dart run tool/mozais.dart $command [options]');
+  if (command == 'verify-perf') {
+    stdout.writeln(
+      'Options: --format text|json, --report PATH, --cycles COUNT (minimum: 3).',
+    );
+  } else {
+    stdout.writeln('Options: --format text|json, --report PATH.');
+  }
+}
+
+_CliOptions _parseOptions(String command, List<String> arguments) {
+  var format = RunOutputFormat.text;
+  var cycles = _minimumPerfCycles;
+  String? reportPath;
+  var formatSeen = false;
+  var cyclesSeen = false;
+  var reportSeen = false;
+
+  for (var index = 0; index < arguments.length; index++) {
+    final option = arguments[index];
+    if (!const {'--format', '--report', '--cycles'}.contains(option)) {
+      throw FormatException('Unknown option: $option');
+    }
+    if (index + 1 >= arguments.length ||
+        arguments[index + 1].startsWith('--')) {
+      throw FormatException('Missing value for $option.');
+    }
+    final value = arguments[++index];
+    switch (option) {
+      case '--format':
+        if (formatSeen) {
+          throw const FormatException('Duplicate --format option.');
+        }
+        formatSeen = true;
+        format = switch (value) {
+          'text' => RunOutputFormat.text,
+          'json' => RunOutputFormat.json,
+          _ => throw FormatException('Unknown output format: $value'),
+        };
+      case '--report':
+        if (reportSeen) {
+          throw const FormatException('Duplicate --report option.');
+        }
+        reportSeen = true;
+        reportPath = value;
+      case '--cycles':
+        if (command != 'verify-perf') {
+          throw const FormatException(
+            '--cycles is only valid for verify-perf.',
+          );
+        }
+        if (cyclesSeen) {
+          throw const FormatException('Duplicate --cycles option.');
+        }
+        cyclesSeen = true;
+        final parsedCycles = int.tryParse(value);
+        if (parsedCycles == null || parsedCycles < _minimumPerfCycles) {
+          throw FormatException(
+            '--cycles must be an integer of at least $_minimumPerfCycles.',
+          );
+        }
+        cycles = parsedCycles;
+      default:
+        throw FormatException('Unknown option: $option');
+    }
+  }
+
+  return _CliOptions(format: format, cycles: cycles, reportPath: reportPath);
+}
+
+Directory _findRepoRoot() {
+  var directory = File.fromUri(Platform.script).parent.absolute;
+  while (true) {
+    final hasRootManifest = File(_join(directory.path, 'pubspec.yaml'))
+        .existsSync();
+    final hasBackendManifest = File(_join(directory.path, 'backend/Cargo.toml'))
+        .existsSync();
+    if (hasRootManifest && hasBackendManifest) {
+      return directory;
+    }
+    final parent = directory.parent;
+    if (parent.path == directory.path) {
+      throw StateError('Could not locate the Mozais repository root.');
+    }
+    directory = parent;
+  }
+}
+
+String _join(String base, String relative) {
+  return '$base${Platform.pathSeparator}${relative.replaceAll('/', Platform.pathSeparator)}';
+}
+
+class _CliOptions {
+  const _CliOptions({
+    required this.format,
+    required this.cycles,
+    required this.reportPath,
+  });
+
+  final RunOutputFormat format;
+  final int cycles;
+  final String? reportPath;
+}

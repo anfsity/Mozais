@@ -284,11 +284,11 @@ Each interaction also records the first response frame separately from its
 later animation frames. Its UI-thread build/layout/paint work must stay below
 5 ms in every measured cycle; raster, vsync scheduling, and normal transitions
 remain covered by the frame metrics above.
-Run `bash scripts/trace-perf-builds.sh` to capture widget build, layout, and
-paint events during startup and first wake in a separate profile run; its
-timings are diagnostic and are not used by the performance gate. Set
-`MOZAIS_FLUTTER_BIN` to use a specific Flutter SDK; the matching Dart binary
-is taken from the same SDK directory.
+Run `fvm dart run tool/mozais.dart trace-perf` to capture widget build, layout,
+and paint events during a separate profile run; its timings are diagnostic
+and are not used by the performance gate. Set `MOZAIS_FLUTTER_BIN` to use a
+specific Flutter SDK; the matching Dart binary is taken from the same SDK
+directory.
 
 ## 9. Implementation Order
 

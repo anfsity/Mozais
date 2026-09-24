@@ -50,7 +50,7 @@ class SceneEditorController extends ChangeNotifier {
   /// Notifies when the document under edit changes.
   Listenable get documentListenable => _documentNotifier;
 
-  /// Notifies when the node list's displayed ids, kinds, or order change.
+  /// Notifies when the node list's IDs, components, or order change.
   Listenable get nodesListenable => _nodesNotifier;
 
   /// Notifies when the selected node changes.
@@ -301,7 +301,7 @@ class SceneEditorController extends ChangeNotifier {
     final id = _uniqueNodeId(document, 'node');
     final node = SceneNode(
       id: id,
-      kind: SceneNodeKind.decoration,
+      componentId: 'decoration',
       rect: const SceneRect(x: 0.4, y: 0.4, width: 0.2, height: 0.2),
     );
     _setDocument(document.copyWith(nodes: [...document.nodes, node]));
@@ -371,7 +371,8 @@ bool _nodesChanged(SceneDocument? previous, SceneDocument next) {
     return true;
   }
   for (var i = 0; i < before.length; i++) {
-    if (before[i].id != after[i].id || before[i].kind != after[i].kind) {
+    if (before[i].id != after[i].id ||
+        before[i].componentId != after[i].componentId) {
       return true;
     }
   }

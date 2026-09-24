@@ -33,6 +33,8 @@ the built-in file browser; the path field still accepts a path directly.
   Properties) for the document, rect, transform (including X/Y/Z rotation),
   layout, and properties. The tab strip scrolls with the wheel or a
   middle-button drag.
+- Node identity stores a theme-owned component ID and an explicit interactive
+  flag; the scene schema does not define a global component catalog.
 - A Document tab edits `canvas` and `background`. Import copies a file into the
   repository `assets/` directory and sets the background kind from the
   extension; a video import renders solid until a video renderer exists. The

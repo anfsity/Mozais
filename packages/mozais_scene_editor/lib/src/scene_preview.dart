@@ -451,7 +451,7 @@ Size _fit(Size available, double aspectRatio) {
 /// Draws a labelled placeholder for a node so the editor preview shows layout
 /// without depending on the greeter's widget catalog.
 Widget buildPlaceholderNode(BuildContext context, SceneNode node) {
-  final color = _kindColor(node.kind);
+  final color = _componentColor(node.componentId);
   return DecoratedBox(
     decoration: BoxDecoration(
       color: color.withValues(alpha: 0.22),
@@ -477,8 +477,11 @@ Widget buildPlaceholderNode(BuildContext context, SceneNode node) {
   );
 }
 
-Color _kindColor(SceneNodeKind kind) {
-  final hue = (kind.index * 47) % 360;
+Color _componentColor(String componentId) {
+  var hue = 0;
+  for (final codeUnit in componentId.codeUnits) {
+    hue = (hue * 31 + codeUnit) % 360;
+  }
   return HSLColor.fromAHSL(1, hue.toDouble(), 0.6, 0.65).toColor();
 }
 

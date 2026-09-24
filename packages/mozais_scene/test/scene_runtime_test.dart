@@ -11,12 +11,12 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'static',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
         ),
         SceneNode(
           id: 'animated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.4, y: 0.1, width: 0.2, height: 0.2),
           motion: SceneMotionPreset.fade,
         ),
@@ -67,13 +67,13 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'later',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.2, y: 0.2, width: 0.2, height: 0.2),
           renderOrder: 20,
         ),
         SceneNode(
           id: 'earlier',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           renderOrder: 10,
         ),
@@ -96,9 +96,9 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'tiny_action',
-          kind: SceneNodeKind.primaryAction,
+          componentId: 'primaryAction',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.001, height: 0.001),
-          action: SceneAction.beginAuthentication,
+          interactive: true,
         ),
       ],
     );
@@ -124,7 +124,7 @@ void main() {
         nodes: const [
           SceneNode(
             id: 'content',
-            kind: SceneNodeKind.decoration,
+            componentId: 'decoration',
             rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           ),
         ],
@@ -150,7 +150,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'content',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
         ),
       ],
@@ -174,7 +174,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'gated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
         ),
@@ -195,7 +195,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'gated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
         ),
@@ -222,7 +222,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'gated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
         ),
@@ -254,7 +254,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'gated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),
         ),
@@ -300,7 +300,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'gated',
-          kind: SceneNodeKind.decoration,
+          componentId: 'decoration',
           rect: SceneRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2),
           motion: SceneMotionPreset.fade,
           visibleWhen: ScenePredicateCondition(ScenePredicate.isDormant),

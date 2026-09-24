@@ -18,11 +18,9 @@ class DefaultThemeComponents implements GreeterThemeComponents {
 
   @override
   Widget build(BuildContext context, SceneNode node) {
-    return switch (node.kind) {
-      SceneNodeKind.dateTime => ThemeClock(
-        isTime: node.properties['variant'] == 'time',
-      ),
-      SceneNodeKind.powerActions => SceneRegion<PowerSlots>(
+    return switch (node.componentId) {
+      'dateTime' => ThemeClock(isTime: node.properties['variant'] == 'time'),
+      'powerActions' => SceneRegion<PowerSlots>(
         valueListenable: host.powerSlots,
         builder: (context, power) => PowerActions(
           power: power,
@@ -31,11 +29,11 @@ class DefaultThemeComponents implements GreeterThemeComponents {
           },
         ),
       ),
-      SceneNodeKind.glassPanel => ThemePanel(
+      'glassPanel' => ThemePanel(
         tokens: host.tokens,
         child: const SizedBox.expand(),
       ),
-      SceneNodeKind.avatar => SceneRegion<AccountPickerSlots>(
+      'avatar' => SceneRegion<AccountPickerSlots>(
         valueListenable: host.accountPickerSlots,
         builder: (context, account) => AccountAvatar(
           account: account,
@@ -45,11 +43,11 @@ class DefaultThemeComponents implements GreeterThemeComponents {
           },
         ),
       ),
-      SceneNodeKind.accountName => SceneRegion<AccountPickerSlots>(
+      'accountName' => SceneRegion<AccountPickerSlots>(
         valueListenable: host.accountPickerSlots,
         builder: (context, account) => AccountName(account: account),
       ),
-      SceneNodeKind.sessionPicker => SceneRegion<SessionPickerSlots>(
+      'sessionPicker' => SceneRegion<SessionPickerSlots>(
         valueListenable: host.sessionPickerSlots,
         builder: (context, session) => SessionPicker(
           session: session,
@@ -61,7 +59,7 @@ class DefaultThemeComponents implements GreeterThemeComponents {
           },
         ),
       ),
-      SceneNodeKind.credentialField => SceneRegion<AuthPromptSlots>(
+      'credentialField' => SceneRegion<AuthPromptSlots>(
         valueListenable: host.authPromptSlots,
         builder: (context, auth) => CredentialField(
           auth: auth,
@@ -69,7 +67,7 @@ class DefaultThemeComponents implements GreeterThemeComponents {
           focusNode: host.credentialFocusNode,
         ),
       ),
-      SceneNodeKind.primaryAction => SceneRegion<AuthPromptSlots>(
+      'primaryAction' => SceneRegion<AuthPromptSlots>(
         valueListenable: host.authPromptSlots,
         builder: (context, auth) => PrimaryAction(
           auth: auth,
@@ -79,7 +77,7 @@ class DefaultThemeComponents implements GreeterThemeComponents {
           },
         ),
       ),
-      SceneNodeKind.status => ListenableBuilder(
+      'status' => ListenableBuilder(
         listenable: Listenable.merge([
           host.serviceSlots,
           host.authPromptSlots,
@@ -91,10 +89,11 @@ class DefaultThemeComponents implements GreeterThemeComponents {
           session: host.sessionPickerSlots.value,
         ),
       ),
-      SceneNodeKind.background ||
-      SceneNodeKind.accountPicker ||
-      SceneNodeKind.secondaryAction ||
-      SceneNodeKind.decoration => const SizedBox.shrink(),
+      'background' ||
+      'accountPicker' ||
+      'secondaryAction' ||
+      'decoration' => const SizedBox.shrink(),
+      _ => const SizedBox.shrink(),
     };
   }
 }

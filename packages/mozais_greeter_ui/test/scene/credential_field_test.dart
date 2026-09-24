@@ -19,7 +19,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'credential',
-          kind: SceneNodeKind.credentialField,
+          componentId: 'credentialField',
           rect: SceneRect(x: 0.3, y: 0.5, width: 0.4, height: 0.06),
           visibleWhen: SceneNot(
             ScenePredicateCondition(ScenePredicate.isDormant),

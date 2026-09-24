@@ -13,7 +13,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'panel',
-          kind: SceneNodeKind.glassPanel,
+          componentId: 'glassPanel',
           rect: SceneRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6),
         ),
       ],
@@ -53,7 +53,7 @@ void main() {
       nodes: const [
         SceneNode(
           id: 'session',
-          kind: SceneNodeKind.sessionPicker,
+          componentId: 'sessionPicker',
           rect: SceneRect(x: 0.2, y: 0.2, width: 0.6, height: 0.1),
           visibleWhen: SceneNot(
             ScenePredicateCondition(ScenePredicate.isDormant),

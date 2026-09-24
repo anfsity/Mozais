@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:mozais_scene/mozais_scene.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
 
-import '../../../feature/greeter/greeter_commands.dart';
-import '../../../feature/greeter/greeter_slots.dart';
-import '../../../theme/theme_components.dart';
-import '../../../scene/scene_region.dart';
 import 'account_components.dart';
 import 'authentication_components.dart';
 import 'session_component.dart';
@@ -12,35 +8,30 @@ import 'status_component.dart';
 import 'system_components.dart';
 
 class DefaultThemeComponents implements GreeterThemeComponents {
-  const DefaultThemeComponents(this.host);
+  const DefaultThemeComponents(this.theme);
 
-  final GreeterThemeContext host;
+  final GreeterThemeContext theme;
 
   @override
   Widget build(BuildContext context, SceneNode node) {
+    final host = theme.host;
     return switch (node.componentId) {
       'dateTime' => ThemeClock(isTime: node.properties['variant'] == 'time'),
       'powerActions' => SceneRegion<PowerSlots>(
         valueListenable: host.powerSlots,
-        builder: (context, power) => PowerActions(
-          power: power,
-          onAction: (action) {
-            host.onDispatch(RequestPowerActionCommand(action));
-          },
-        ),
+        builder: (context, power) =>
+            PowerActions(power: power, onAction: host.onRequestPowerAction),
       ),
       'glassPanel' => ThemePanel(
-        tokens: host.tokens,
+        tokens: theme.tokens,
         child: const SizedBox.expand(),
       ),
       'avatar' => SceneRegion<AccountPickerSlots>(
         valueListenable: host.accountPickerSlots,
         builder: (context, account) => AccountAvatar(
           account: account,
-          tokens: host.tokens,
-          onSelect: (user) {
-            host.onDispatch(SelectUserCommand(user));
-          },
+          tokens: theme.tokens,
+          onSelect: host.onSelectUser,
         ),
       ),
       'accountName' => SceneRegion<AccountPickerSlots>(
@@ -51,12 +42,8 @@ class DefaultThemeComponents implements GreeterThemeComponents {
         valueListenable: host.sessionPickerSlots,
         builder: (context, session) => SessionPicker(
           session: session,
-          onSelect: (value) {
-            host.onDispatch(SelectSessionCommand(value));
-          },
-          onRetry: () {
-            host.onDispatch(const RetrySessionCatalogCommand());
-          },
+          onSelect: host.onSelectSession,
+          onRetry: host.onRetrySessionCatalog,
         ),
       ),
       'credentialField' => SceneRegion<AuthPromptSlots>(
@@ -71,10 +58,8 @@ class DefaultThemeComponents implements GreeterThemeComponents {
         valueListenable: host.authPromptSlots,
         builder: (context, auth) => PrimaryAction(
           auth: auth,
-          onRespond: host.onRespond,
-          onRetry: (recovery) {
-            host.onDispatch(recoveryCommand(recovery));
-          },
+          onRespond: host.onRespondToPrompt,
+          onRetry: host.onRetry,
         ),
       ),
       'status' => ListenableBuilder(

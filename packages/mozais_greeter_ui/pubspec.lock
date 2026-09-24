@@ -328,6 +328,13 @@ packages:
       relative: true
     source: path
     version: "0.0.0"
+  mozais_theme_sdk:
+    dependency: "direct main"
+    description:
+      path: "../mozais_theme_sdk"
+      relative: true
+    source: path
+    version: "0.0.0"
   package_config:
     dependency: transitive
     description:

@@ -2,10 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:mozais_scene/mozais_scene.dart';
-
-import '../../../feature/greeter/greeter_slots.dart';
-import '../../../feature/greeter/greeter_state.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
 
 class AccountAvatar extends StatelessWidget {
   const AccountAvatar({

@@ -13,9 +13,9 @@ export 'feature/greeter/greeter_state.dart';
 export 'feature/greeter/ports/greeter_gateway.dart';
 export 'feature/greeter/ports/session_store.dart';
 export 'scene/greeter_scene/greeter_scene_adapter.dart';
-export 'scene/scene_region.dart';
-export 'theme/theme_components.dart';
-export 'theme/theme_definition.dart';
+
+export 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
+
 export 'theme/theme_registry.dart';
 export 'themes/default/theme.dart';
 export 'themes/fallback/theme.dart';

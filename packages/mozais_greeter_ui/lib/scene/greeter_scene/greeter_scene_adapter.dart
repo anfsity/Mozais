@@ -4,14 +4,13 @@ import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mozais_scene/mozais_scene.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
 
 import '../../feature/greeter/greeter_commands.dart';
 import '../../feature/greeter/greeter_effect.dart';
 import '../../feature/greeter/greeter_feature.dart';
 import '../../feature/greeter/greeter_slots.dart';
 import '../../feature/greeter/greeter_state.dart';
-import '../../theme/theme_components.dart';
-import '../../theme/theme_definition.dart';
 
 /// Maps the current greeter slots onto the scene predicate vocabulary.
 Set<ScenePredicate> activeScenePredicates({
@@ -136,16 +135,25 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   GreeterThemeComponents _createComponents() {
     return widget.theme.components(
       GreeterThemeContext(
-        serviceSlots: widget.feature.serviceSlots,
-        authPromptSlots: widget.feature.authPromptSlots,
-        accountPickerSlots: widget.feature.accountPickerSlots,
-        sessionPickerSlots: widget.feature.sessionPickerSlots,
-        powerSlots: widget.feature.powerSlots,
+        host: GreeterHost(
+          serviceSlots: widget.feature.serviceSlots,
+          authPromptSlots: widget.feature.authPromptSlots,
+          accountPickerSlots: widget.feature.accountPickerSlots,
+          sessionPickerSlots: widget.feature.sessionPickerSlots,
+          powerSlots: widget.feature.powerSlots,
+          credentialController: _credentialController,
+          credentialFocusNode: _credentialFocusNode,
+          onSelectUser: (user) => _dispatch(SelectUserCommand(user)),
+          onSelectSession: (session) =>
+              _dispatch(SelectSessionCommand(session)),
+          onRequestPowerAction: (action) =>
+              _dispatch(RequestPowerActionCommand(action)),
+          onRetry: (recovery) => _dispatch(recoveryCommand(recovery)),
+          onRetrySessionCatalog: () =>
+              _dispatch(const RetrySessionCatalogCommand()),
+          onRespondToPrompt: _respondToPrompt,
+        ),
         tokens: widget.theme.tokens,
-        credentialController: _credentialController,
-        credentialFocusNode: _credentialFocusNode,
-        onDispatch: _dispatch,
-        onRespond: _respondToPrompt,
       ),
     );
   }

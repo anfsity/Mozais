@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-
-import '../../../feature/greeter/greeter_slots.dart';
-import '../../../feature/greeter/greeter_state.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
 
 class SessionPicker extends StatelessWidget {
   const SessionPicker({

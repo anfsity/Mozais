@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mozais_scene/mozais_scene.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart' show ThemeDefinition;
 
-import '../../theme/theme_definition.dart';
 import '../default/components/default_theme_components.dart';
 import 'fallback.scene.g.dart';
 

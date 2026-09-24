@@ -3,10 +3,8 @@ import 'package:mozais_scene/mozais_scene.dart';
 
 import 'theme_components.dart';
 
-/// A theme-owned scene and the components used to render its nodes.
-///
-/// [ThemeBundle] contains visual runtime tokens and renderer registrations;
-/// the authored scene and its component set stay owned by this theme.
+/// Complete compile-time theme bundle: its scene, component implementation,
+/// and visual runtime configuration are constructed together by its package.
 class ThemeDefinition {
   const ThemeDefinition({
     required this.id,

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
 
 import '../themes/default/theme.dart';
 import '../themes/fallback/theme.dart';
-import 'palette_extractor.dart';
-import 'theme_definition.dart';
 
 class ThemeRegistry {
   const ThemeRegistry._();

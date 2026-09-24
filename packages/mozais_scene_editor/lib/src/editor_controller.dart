@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
-import 'package:mozais_greeter_ui/theme/palette_extractor.dart';
 import 'package:mozais_scene/mozais_scene.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
 
 import 'editor_status.dart';
 import 'repo_root.dart';
@@ -30,10 +30,12 @@ class SceneEditorController extends ChangeNotifier {
   final ValueNotifier<SceneDocument?> _documentNotifier = ValueNotifier(null);
   final ValueNotifier<int> _nodesNotifier = ValueNotifier(0);
   final ValueNotifier<String?> _selectionNotifier = ValueNotifier(null);
-  final ValueNotifier<Set<ScenePredicate>> _predicatesNotifier =
-      ValueNotifier(const {});
-  final ValueNotifier<EditorStatus> _statusNotifier =
-      ValueNotifier(EditorStatus.idle);
+  final ValueNotifier<Set<ScenePredicate>> _predicatesNotifier = ValueNotifier(
+    const {},
+  );
+  final ValueNotifier<EditorStatus> _statusNotifier = ValueNotifier(
+    EditorStatus.idle,
+  );
   final ValueNotifier<bool> _dirtyNotifier = ValueNotifier(false);
   final ValueNotifier<bool> _openingNotifier = ValueNotifier(false);
   final ValueNotifier<bool> _savingNotifier = ValueNotifier(false);

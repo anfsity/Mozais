@@ -88,8 +88,8 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   final TextEditingController _credentialController = TextEditingController();
   final FocusNode _credentialFocusNode = FocusNode();
   final List<String> _typeahead = <String>[];
-  late final StreamSubscription<FeatureEffect> _effectSubscription;
-  late final Listenable _featureSlotChanges;
+  late StreamSubscription<FeatureEffect> _effectSubscription;
+  late Listenable _featureSlotChanges;
   late final AnimationController _wakeController;
   late Widget _scene;
   late final ValueNotifier<Set<ScenePredicate>> _activeScenePredicates;
@@ -98,21 +98,13 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   void initState() {
     super.initState();
     _activeScenePredicates = ValueNotifier(_activePredicates());
-    _effectSubscription = widget.feature.effects.listen(_handleEffect);
-    _featureSlotChanges = Listenable.merge([
-      widget.feature.serviceSlots,
-      widget.feature.authPromptSlots,
-      widget.feature.accountPickerSlots,
-      widget.feature.sessionPickerSlots,
-      widget.feature.powerSlots,
-    ])..addListener(_handleSceneSlotsChanged);
+    _listenToFeature(widget.feature);
     _wakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
       value: widget.feature.dormantSlots.value ? 0 : 1,
     );
     _scene = _createScene();
-    widget.feature.dormantSlots.addListener(_handleDormantChanged);
     // Key handling must not depend on the focus chain: the credential field
     // is disabled between attempts, which drops focus to the root scope.
     if (widget.handleKeyboard) {
@@ -130,10 +122,39 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
         FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
       }
     }
-    if (widget.theme != oldWidget.theme) {
+    final featureChanged = !identical(widget.feature, oldWidget.feature);
+    if (featureChanged) {
+      _stopListeningToFeature(oldWidget.feature);
+      _listenToFeature(widget.feature);
+      _credentialController.clear();
+      _typeahead.clear();
+      _credentialFocusNode.unfocus();
+      _wakeController.value = widget.feature.dormantSlots.value ? 0 : 1;
+    }
+    if (featureChanged || widget.theme != oldWidget.theme) {
       _activeScenePredicates.value = _activePredicates();
       _scene = _createScene();
     }
+  }
+
+  void _listenToFeature(GreeterFeature feature) {
+    _effectSubscription = feature.effects.listen(
+      (effect) => _handleEffect(feature, effect),
+    );
+    _featureSlotChanges = Listenable.merge([
+      feature.serviceSlots,
+      feature.authPromptSlots,
+      feature.accountPickerSlots,
+      feature.sessionPickerSlots,
+      feature.powerSlots,
+    ])..addListener(_handleSceneSlotsChanged);
+    feature.dormantSlots.addListener(_handleDormantChanged);
+  }
+
+  void _stopListeningToFeature(GreeterFeature feature) {
+    _featureSlotChanges.removeListener(_handleSceneSlotsChanged);
+    feature.dormantSlots.removeListener(_handleDormantChanged);
+    unawaited(_effectSubscription.cancel());
   }
 
   Widget _createScene() {
@@ -166,10 +187,8 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     if (widget.handleKeyboard) {
       FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
     }
-    _featureSlotChanges.removeListener(_handleSceneSlotsChanged);
-    widget.feature.dormantSlots.removeListener(_handleDormantChanged);
+    _stopListeningToFeature(widget.feature);
     _activeScenePredicates.dispose();
-    unawaited(_effectSubscription.cancel());
     _wakeController.dispose();
     _credentialController.dispose();
     _credentialFocusNode.dispose();
@@ -353,7 +372,10 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     unawaited(widget.feature.dispatch(command));
   }
 
-  void _handleEffect(FeatureEffect effect) {
+  void _handleEffect(GreeterFeature source, FeatureEffect effect) {
+    if (!mounted || !identical(widget.feature, source)) {
+      return;
+    }
     switch (effect) {
       case RequestFocusEffect(:final field):
         if (field == 'credential') {
@@ -361,7 +383,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
         }
       case ShowNoticeEffect(:final message, :final isError):
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) {
+          if (!mounted || !identical(widget.feature, source)) {
             return;
           }
           final messenger = ScaffoldMessenger.of(context);

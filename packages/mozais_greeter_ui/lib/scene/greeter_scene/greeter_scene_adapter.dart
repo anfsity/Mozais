@@ -11,8 +11,6 @@ import 'package:mozais_theme_sdk/mozais_theme_sdk.dart'
         AuthPromptSlots,
         CatalogMode,
         GreeterHost,
-        GreeterThemeComponents,
-        GreeterThemeContext,
         PowerMode,
         PowerSlots,
         ServiceMode,
@@ -92,16 +90,13 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   final List<String> _typeahead = <String>[];
   late final StreamSubscription<FeatureEffect> _effectSubscription;
   late final Listenable _featureSlotChanges;
-  late final AnimationController _blurController;
-  late Animation<double> _blurAnimation;
-  late GreeterThemeComponents _components;
-  late Widget _sceneRuntime;
+  late final AnimationController _wakeController;
+  late Widget _scene;
   late final ValueNotifier<Set<ScenePredicate>> _activeScenePredicates;
 
   @override
   void initState() {
     super.initState();
-    _components = _createComponents();
     _activeScenePredicates = ValueNotifier(_activePredicates());
     _effectSubscription = widget.feature.effects.listen(_handleEffect);
     _featureSlotChanges = Listenable.merge([
@@ -111,13 +106,12 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       widget.feature.sessionPickerSlots,
       widget.feature.powerSlots,
     ])..addListener(_handleSceneSlotsChanged);
-    _blurController = AnimationController(
+    _wakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
       value: widget.feature.dormantSlots.value ? 0 : 1,
     );
-    _blurAnimation = _createBlurAnimation();
-    _sceneRuntime = _createSceneRuntime();
+    _scene = _createScene();
     widget.feature.dormantSlots.addListener(_handleDormantChanged);
     // Key handling must not depend on the focus chain: the credential field
     // is disabled between attempts, which drops focus to the root scope.
@@ -137,60 +131,34 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       }
     }
     if (widget.theme != oldWidget.theme) {
-      _components = _createComponents();
-      _blurAnimation = _createBlurAnimation();
       _activeScenePredicates.value = _activePredicates();
-      _sceneRuntime = _createSceneRuntime();
+      _scene = _createScene();
     }
   }
 
-  GreeterThemeComponents _createComponents() {
-    return widget.theme.components(
-      GreeterThemeContext(
-        host: GreeterHost(
-          serviceSlots: widget.feature.serviceSlots,
-          authPromptSlots: widget.feature.authPromptSlots,
-          accountPickerSlots: widget.feature.accountPickerSlots,
-          sessionPickerSlots: widget.feature.sessionPickerSlots,
-          powerSlots: widget.feature.powerSlots,
-          credentialController: _credentialController,
-          credentialFocusNode: _credentialFocusNode,
-          onSelectUser: (user) => _dispatch(SelectUserCommand(user)),
-          onSelectSession: (session) =>
-              _dispatch(SelectSessionCommand(session)),
-          onRequestPowerAction: (action) =>
-              _dispatch(RequestPowerActionCommand(action)),
-          onRetry: (recovery) => _dispatch(recoveryCommand(recovery)),
-          onRetrySessionCatalog: () =>
-              _dispatch(const RetrySessionCatalogCommand()),
-          onRespondToPrompt: _respondToPrompt,
-        ),
-        tokens: widget.theme.tokens,
+  Widget _createScene() {
+    return widget.theme.buildScene(
+      host: GreeterHost(
+        serviceSlots: widget.feature.serviceSlots,
+        authPromptSlots: widget.feature.authPromptSlots,
+        accountPickerSlots: widget.feature.accountPickerSlots,
+        sessionPickerSlots: widget.feature.sessionPickerSlots,
+        powerSlots: widget.feature.powerSlots,
+        credentialController: _credentialController,
+        credentialFocusNode: _credentialFocusNode,
+        onSelectUser: (user) => _dispatch(SelectUserCommand(user)),
+        onSelectSession: (session) => _dispatch(SelectSessionCommand(session)),
+        onRequestPowerAction: (action) =>
+            _dispatch(RequestPowerActionCommand(action)),
+        onRetry: (recovery) => _dispatch(recoveryCommand(recovery)),
+        onRetrySessionCatalog: () =>
+            _dispatch(const RetrySessionCatalogCommand()),
+        onRespondToPrompt: _respondToPrompt,
       ),
-    );
-  }
-
-  Widget _createSceneRuntime() {
-    return SceneRuntime(
-      document: widget.theme.document,
-      theme: widget.theme.bundle,
       activePredicates: _activeScenePredicates.value,
       activePredicatesListenable: _activeScenePredicates,
-      backgroundBlurSigma: _blurAnimation,
-      prewarmHiddenNodes: true,
-      nodeBuilder: _components.build,
+      wakeProgress: _wakeController,
     );
-  }
-
-  Animation<double> _createBlurAnimation() {
-    return _blurController
-        .drive(CurveTween(curve: Curves.easeOutCubic))
-        .drive(
-          Tween<double>(
-            begin: 0,
-            end: widget.theme.document.background.blurSigma,
-          ),
-        );
   }
 
   @override
@@ -202,7 +170,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     widget.feature.dormantSlots.removeListener(_handleDormantChanged);
     _activeScenePredicates.dispose();
     unawaited(_effectSubscription.cancel());
-    _blurController.dispose();
+    _wakeController.dispose();
     _credentialController.dispose();
     _credentialFocusNode.dispose();
     super.dispose();
@@ -219,7 +187,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
             _dispatch(const WakeGreeterCommand());
           }
         },
-        child: _sceneRuntime,
+        child: _scene,
       ),
     );
   }
@@ -250,9 +218,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       _credentialController.clear();
       _typeahead.clear();
       _credentialFocusNode.unfocus();
-      _blurController.reverse();
+      _wakeController.reverse();
     } else {
-      _blurController.forward();
+      _wakeController.forward();
     }
     _handleSceneSlotsChanged();
   }

@@ -137,11 +137,13 @@ ThemeDefinition
 ```
 
 `ThemeBundle` contains only visual tokens and renderer registrations. The
-generic `SceneRuntime` receives the authored document, visual bundle, and
-theme-owned node builder as separate inputs; the scene document does not choose
-the theme. Each theme declares its component factory with its scene. A theme
-may explicitly reuse an existing component implementation when the behavior
-and presentation are shared, as the fallback theme currently does.
+theme definition exposes `buildScene`, which combines that theme's authored
+document, visual bundle, and component factory into the generic `SceneRuntime`.
+The greeter adapter supplies semantic state, host capabilities, and wake
+progress; it does not assemble the scene runtime. Each theme declares its
+component factory with its scene. A theme may explicitly reuse an existing
+component implementation when the behavior and presentation are shared, as the
+fallback theme currently does.
 
 The reusable semantic API lives in `mozais_theme_sdk`. It exposes display-safe
 slot listenables and semantic callbacks through `GreeterHost`, without giving a
@@ -231,11 +233,11 @@ Full-screen animated blur is out of scope.
 ## 7. Greeter Adapter and Slots
 
 `GreeterFeature` exposes typed region slots and commands. `GreeterSceneAdapter`
-maps display state to scene predicates, selects the `ThemeDefinition`, and
-provides that theme's component assembly with typed slot listenables and UI
-callbacks. Theme components cannot reach the `GreeterFeature` state owner. The
-theme component set maps its own scene nodes to ordinary Flutter widgets,
-preserving native input, focus, keyboard, and accessibility behavior.
+maps display state to scene predicates, creates the narrow `GreeterHost`, and
+asks the selected `ThemeDefinition` to build its scene. Theme components cannot
+reach the `GreeterFeature` state owner. The theme component set maps its own
+scene nodes to ordinary Flutter widgets, preserving native input, focus,
+keyboard, and accessibility behavior.
 
 The Feature projection contains no `BackgroundSlots`. Visual mood is derived by
 the adapter or theme when a theme explicitly needs it. The credential response

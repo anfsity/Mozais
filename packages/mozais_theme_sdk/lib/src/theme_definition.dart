@@ -29,6 +29,7 @@ class ThemeDefinition {
     required Set<ScenePredicate> activePredicates,
     required ValueListenable<Set<ScenePredicate>> activePredicatesListenable,
     required Animation<double> wakeProgress,
+    SceneNodeDraft? draft,
   }) {
     final components = this.components(
       GreeterThemeContext(host: host, tokens: tokens),
@@ -43,6 +44,7 @@ class ThemeDefinition {
       activePredicatesListenable: activePredicatesListenable,
       backgroundBlurSigma: backgroundBlurSigma,
       prewarmHiddenNodes: true,
+      draft: draft,
       nodeBuilder: components.build,
     );
   }

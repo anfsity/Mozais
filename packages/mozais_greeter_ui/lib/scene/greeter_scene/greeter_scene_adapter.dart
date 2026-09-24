@@ -64,6 +64,7 @@ class GreeterSceneAdapter extends StatefulWidget {
     required this.theme,
     this.handleKeyboard = true,
     this.exitOnHandoff = true,
+    this.draft,
     super.key,
   });
 
@@ -78,6 +79,9 @@ class GreeterSceneAdapter extends StatefulWidget {
 
   /// Whether a successful session start closes the host application.
   final bool exitOnHandoff;
+
+  /// Supplies transient geometry for one node while an editor gesture runs.
+  final SceneNodeDraft? draft;
 
   @override
   State<GreeterSceneAdapter> createState() => _GreeterSceneAdapterState();
@@ -131,7 +135,9 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       _credentialFocusNode.unfocus();
       _wakeController.value = widget.feature.dormantSlots.value ? 0 : 1;
     }
-    if (featureChanged || widget.theme != oldWidget.theme) {
+    if (featureChanged ||
+        widget.theme != oldWidget.theme ||
+        widget.draft != oldWidget.draft) {
       _activeScenePredicates.value = _activePredicates();
       _scene = _createScene();
     }
@@ -179,6 +185,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       activePredicates: _activeScenePredicates.value,
       activePredicatesListenable: _activeScenePredicates,
       wakeProgress: _wakeController,
+      draft: widget.draft,
     );
   }
 

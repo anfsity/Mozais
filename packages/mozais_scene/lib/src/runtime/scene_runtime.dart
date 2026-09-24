@@ -5,6 +5,7 @@ import 'package:mozais_scene_schema/mozais_scene_schema.dart';
 import '../model/theme_bundle.dart';
 import 'builtin_backgrounds.dart';
 import 'motion.dart';
+import 'node_draft.dart';
 import 'node_transform.dart';
 
 typedef SceneNodeBuilder = Widget Function(
@@ -21,6 +22,7 @@ class SceneRuntime extends StatelessWidget {
     this.activePredicatesListenable,
     this.backgroundBlurSigma,
     this.prewarmHiddenNodes = false,
+    this.draft,
     super.key,
   });
 
@@ -47,6 +49,9 @@ class SceneRuntime extends StatelessWidget {
   ///
   /// Hidden nodes remain excluded from pointer, focus, and semantics handling.
   final bool prewarmHiddenNodes;
+
+  /// Supplies transient geometry for one node while an editor gesture runs.
+  final SceneNodeDraft? draft;
 
   @override
   Widget build(BuildContext context) {
@@ -97,14 +102,7 @@ class SceneRuntime extends StatelessWidget {
     final safeArea = document.canvas.useSafeArea
         ? MediaQuery.paddingOf(context)
         : EdgeInsets.zero;
-    final rect = sceneNodeRect(
-      node: node,
-      sceneSize: size,
-      safeArea: safeArea,
-      minHitTarget: theme.tokens.minHitTarget,
-    );
-
-    Widget child = _SceneNodeHost(
+    final content = _SceneNodeHost(
       visible: visible,
       activePredicatesListenable: visibleWhen == null
           ? null
@@ -118,32 +116,78 @@ class SceneRuntime extends StatelessWidget {
         curve: theme.tokens.standardCurve,
         reducedMotion: reducedMotion,
       ),
-      builder: (context) =>
-          _applyTransform(node, rect.size, nodeBuilder(context, node)),
+      builder: (context) => nodeBuilder(context, node),
     );
-    if (node.interactive) {
-      child = FocusTraversalOrder(
-        order: NumericFocusOrder(node.focusOrder.toDouble()),
-        child: child,
+
+    return _SceneNodeLayer(
+      node: node,
+      sceneSize: size,
+      safeArea: safeArea,
+      minHitTarget: theme.tokens.minHitTarget,
+      draftListenable: draft?.getNodeListenable(node.id),
+      content: RepaintBoundary(
+        child: node.interactive
+            ? FocusTraversalOrder(
+                order: NumericFocusOrder(node.focusOrder.toDouble()),
+                child: content,
+              )
+            : content,
+      ),
+    );
+  }
+}
+
+class _SceneNodeLayer extends StatelessWidget {
+  const _SceneNodeLayer({
+    required this.node,
+    required this.sceneSize,
+    required this.safeArea,
+    required this.minHitTarget,
+    required this.draftListenable,
+    required this.content,
+  });
+
+  final SceneNode node;
+  final Size sceneSize;
+  final EdgeInsets safeArea;
+  final double minHitTarget;
+  final ValueListenable<SceneNode?>? draftListenable;
+  final Widget content;
+
+  @override
+  Widget build(BuildContext context) {
+    final listenable = draftListenable;
+    if (listenable == null) {
+      return _buildPositioned(node, content);
+    }
+    return ValueListenableBuilder<SceneNode?>(
+      valueListenable: listenable,
+      builder: (context, draftNode, child) =>
+          _buildPositioned(draftNode ?? node, child!),
+      child: content,
+    );
+  }
+
+  Widget _buildPositioned(SceneNode geometryNode, Widget child) {
+    final rect = sceneNodeRect(
+      node: geometryNode,
+      sceneSize: sceneSize,
+      safeArea: safeArea,
+      minHitTarget: minHitTarget,
+    );
+    Widget transformed = child;
+    if (!geometryNode.transform.isIdentity) {
+      transformed = Transform(
+        transform: sceneNodeTransformMatrix(geometryNode.transform, rect.size),
+        child: transformed,
       );
     }
-
     return Positioned(
       left: rect.left,
       top: rect.top,
       width: rect.width,
       height: rect.height,
-      child: RepaintBoundary(child: child),
-    );
-  }
-
-  Widget _applyTransform(SceneNode node, Size size, Widget child) {
-    if (node.transform.isIdentity) {
-      return child;
-    }
-    return Transform(
-      transform: sceneNodeTransformMatrix(node.transform, size),
-      child: child,
+      child: transformed,
     );
   }
 }

@@ -60,6 +60,7 @@ class ScenePreview extends StatefulWidget {
 }
 
 class _ScenePreviewState extends State<ScenePreview> {
+  final SceneNodeDraft _draft = SceneNodeDraft();
   SceneDocument? _cachedDocument;
   _ThemeSignature? _themeSignature;
   int _themeRevision = 0;
@@ -76,12 +77,16 @@ class _ScenePreviewState extends State<ScenePreview> {
   @override
   void dispose() {
     _prewarmTimer?.cancel();
+    _draft.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final listenables = <Listenable>[widget.controller.selectionListenable];
+    final listenables = <Listenable>[
+      widget.controller.documentListenable,
+      widget.controller.selectionListenable,
+    ];
     if (widget.mode == PreviewMode.outline) {
       listenables.add(widget.controller.predicatesListenable);
     } else {
@@ -161,6 +166,7 @@ class _ScenePreviewState extends State<ScenePreview> {
                     previewSize: size,
                     safeArea: safeArea,
                     minHitTarget: theme.tokens.minHitTarget,
+                    draftNodeListenable: _draft.getNodeListenable(selected.id),
                     onSelectAt: (position) => _selectNodeAt(
                       position: position,
                       document: document,
@@ -169,13 +175,10 @@ class _ScenePreviewState extends State<ScenePreview> {
                       minHitTarget: theme.tokens.minHitTarget,
                       activePredicates: activePredicates,
                     ),
-                    onRectChanged: (rect) => widget.controller.updateSelected(
-                      (node) => node.copyWith(rect: rect),
-                    ),
-                    onTransformChanged: (transform) =>
-                        widget.controller.updateSelected(
-                          (node) => node.copyWith(transform: transform),
-                        ),
+                    onGestureStart: _beginDraft,
+                    onDraftChanged: _updateDraft,
+                    onGestureEnd: _commitDraft,
+                    onGestureCancel: _cancelDraft,
                   ),
                 )
               else
@@ -235,16 +238,40 @@ class _ScenePreviewState extends State<ScenePreview> {
       safeArea: safeArea,
       minHitTarget: minHitTarget,
       activePredicates: activePredicates,
+      draft: _draft,
     );
     if (id != null) {
       widget.controller.select(id);
     }
   }
 
+  void _beginDraft(SceneNode node) {
+    _draft.begin(node);
+  }
+
+  void _updateDraft(SceneNode node) {
+    _draft.update(node);
+  }
+
+  void _commitDraft(SceneNode draftNode) {
+    final selected = widget.controller.selectedNode;
+    if (selected != null &&
+        selected.id == draftNode.id &&
+        !_sameNodeGeometry(selected, draftNode)) {
+      widget.controller.updateSelected((node) => draftNode);
+    }
+    _draft.clear();
+  }
+
+  void _cancelDraft() {
+    _draft.clear();
+  }
+
   /// Rebuilds the embedded scene only when its inputs change.
   ///
   /// A selection change leaves the scene untouched so the background, blur,
-  /// and greeter widgets are not re-created while the overlay moves.
+  /// and greeter widgets are not re-created while the overlay or a draft
+  /// geometry moves.
   Widget _sceneFor(BuildContext context, SceneDocument document) {
     final signature = _sceneThemeSignature(document);
     if (!identical(_cachedDocument, document)) {
@@ -392,6 +419,7 @@ class _ScenePreviewState extends State<ScenePreview> {
         theme: theme.bundle,
         nodeBuilder: buildPlaceholderNode,
         activePredicates: widget.controller.activePredicates,
+        draft: _draft,
       ),
       PreviewMode.real => Theme(
         data: theme.materialTheme,
@@ -401,6 +429,7 @@ class _ScenePreviewState extends State<ScenePreview> {
           theme: theme,
           handleKeyboard: false,
           exitOnHandoff: false,
+          draft: _draft,
         ),
       ),
     };
@@ -416,7 +445,9 @@ String? hitTestSceneNode({
   required EdgeInsets safeArea,
   required double minHitTarget,
   required Set<ScenePredicate> activePredicates,
+  SceneNodeDraft? draft,
 }) {
+  final draftNode = draft?.node;
   for (final node in document.paintOrder.reversed) {
     final visibleWhen = node.visibleWhen;
     if (visibleWhen != null &&
@@ -424,7 +455,7 @@ String? hitTestSceneNode({
       continue;
     }
     final geometry = _OverlayGeometry(
-      node: node,
+      node: draftNode?.id == node.id ? draftNode! : node,
       previewSize: previewSize,
       safeArea: safeArea,
       minHitTarget: minHitTarget,
@@ -483,6 +514,27 @@ Color _componentColor(String componentId) {
     hue = (hue * 31 + codeUnit) % 360;
   }
   return HSLColor.fromAHSL(1, hue.toDouble(), 0.6, 0.65).toColor();
+}
+
+bool _sameNodeGeometry(SceneNode left, SceneNode right) {
+  final leftRect = left.rect;
+  final rightRect = right.rect;
+  final leftTransform = left.transform;
+  final rightTransform = right.transform;
+  return leftRect.x == rightRect.x &&
+      leftRect.y == rightRect.y &&
+      leftRect.width == rightRect.width &&
+      leftRect.height == rightRect.height &&
+      leftTransform.translateX == rightTransform.translateX &&
+      leftTransform.translateY == rightTransform.translateY &&
+      leftTransform.scaleX == rightTransform.scaleX &&
+      leftTransform.scaleY == rightTransform.scaleY &&
+      leftTransform.rotationX == rightTransform.rotationX &&
+      leftTransform.rotationY == rightTransform.rotationY &&
+      leftTransform.rotationZ == rightTransform.rotationZ &&
+      leftTransform.pivotX == rightTransform.pivotX &&
+      leftTransform.pivotY == rightTransform.pivotY &&
+      leftTransform.perspective == rightTransform.perspective;
 }
 
 enum _DragRegion { none, move, resize, rotateZ, rotate3d }
@@ -590,9 +642,12 @@ class _SelectionOverlay extends StatefulWidget {
     required this.previewSize,
     required this.safeArea,
     required this.minHitTarget,
+    required this.draftNodeListenable,
     required this.onSelectAt,
-    required this.onRectChanged,
-    required this.onTransformChanged,
+    required this.onGestureStart,
+    required this.onDraftChanged,
+    required this.onGestureEnd,
+    required this.onGestureCancel,
     super.key,
   });
 
@@ -602,9 +657,12 @@ class _SelectionOverlay extends StatefulWidget {
   final Size previewSize;
   final EdgeInsets safeArea;
   final double minHitTarget;
+  final ValueListenable<SceneNode?> draftNodeListenable;
   final ValueChanged<Offset> onSelectAt;
-  final ValueChanged<SceneRect> onRectChanged;
-  final ValueChanged<SceneTransform> onTransformChanged;
+  final ValueChanged<SceneNode> onGestureStart;
+  final ValueChanged<SceneNode> onDraftChanged;
+  final ValueChanged<SceneNode> onGestureEnd;
+  final VoidCallback onGestureCancel;
 
   @override
   State<_SelectionOverlay> createState() => _SelectionOverlayState();
@@ -622,11 +680,9 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
   SceneTransform _startTransform = const SceneTransform();
   Offset _startCenter = Offset.zero;
   double _startAngle = 0;
-  SceneRect? _liveRect;
-  SceneTransform? _liveTransform;
 
-  _OverlayGeometry get _geometry => _OverlayGeometry(
-    node: widget.node.copyWith(rect: _liveRect, transform: _liveTransform),
+  _OverlayGeometry _geometryFor(SceneNode? draftNode) => _OverlayGeometry(
+    node: draftNode ?? widget.node,
     previewSize: widget.previewSize,
     safeArea: widget.safeArea,
     minHitTarget: widget.minHitTarget,
@@ -634,7 +690,14 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    final geometry = _geometry;
+    return ValueListenableBuilder<SceneNode?>(
+      valueListenable: widget.draftNodeListenable,
+      builder: (context, draftNode, _) =>
+          _buildOverlay(_geometryFor(draftNode)),
+    );
+  }
+
+  Widget _buildOverlay(_OverlayGeometry geometry) {
     return MouseRegion(
       cursor: _cursorFor(_hoverRegion),
       onHover: (event) =>
@@ -647,7 +710,10 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
           _pressPointer = position;
         },
         onPointerUp: (_) => _pressRegion = _DragRegion.none,
-        onPointerCancel: (_) => _pressRegion = _DragRegion.none,
+        onPointerCancel: (_) {
+          _pressRegion = _DragRegion.none;
+          _handlePanCancel();
+        },
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapUp: (details) =>
@@ -656,7 +722,7 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
           onPanUpdate: (details) =>
               _handlePanUpdate(_toCanvas(details.localPosition)),
           onPanEnd: (_) => _handlePanEnd(),
-          onPanCancel: _handlePanEnd,
+          onPanCancel: _handlePanCancel,
           child: CustomPaint(
             painter: _SelectionPainter(
               geometry: geometry,
@@ -708,13 +774,13 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     _activeRegion = _pressRegion;
     _startGeometry = geometry;
     _startPointer = _pressPointer;
-    _startRect = widget.node.rect;
-    _startTransform = widget.node.transform;
-    _liveRect = _startRect;
-    _liveTransform = _startTransform;
+    final startNode = widget.node;
+    _startRect = startNode.rect;
+    _startTransform = startNode.transform;
     _startCenter = geometry.center;
     final delta = _pressPointer - geometry.center;
     _startAngle = math.atan2(delta.dy, delta.dx);
+    widget.onGestureStart(startNode);
   }
 
   void _handlePanUpdate(Offset position) {
@@ -740,21 +806,20 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     if (_activeRegion == _DragRegion.none) {
       return;
     }
-    final rect = _liveRect;
-    final transform = _liveTransform;
-    if (rect != null && rect != _startRect) {
-      widget.onRectChanged(rect);
-    }
-    if (transform != null && transform != _startTransform) {
-      widget.onTransformChanged(transform);
-    }
+    widget.onGestureEnd(widget.draftNodeListenable.value ?? widget.node);
     _activeRegion = _DragRegion.none;
     _pressRegion = _DragRegion.none;
     _startGeometry = null;
-    setState(() {
-      _liveRect = null;
-      _liveTransform = null;
-    });
+  }
+
+  void _handlePanCancel() {
+    if (_activeRegion == _DragRegion.none) {
+      return;
+    }
+    widget.onGestureCancel();
+    _activeRegion = _DragRegion.none;
+    _pressRegion = _DragRegion.none;
+    _startGeometry = null;
   }
 
   void _applyMove(_OverlayGeometry geometry, Offset delta) {
@@ -763,10 +828,12 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     }
     final dx = delta.dx / geometry.availableWidth;
     final dy = delta.dy / geometry.availableHeight;
-    _setLiveRect(
-      _startRect.copyWith(
-        x: (_startRect.x + dx).clamp(0.0, 1.0 - _startRect.width),
-        y: (_startRect.y + dy).clamp(0.0, 1.0 - _startRect.height),
+    _publishNode(
+      _currentNode.copyWith(
+        rect: _startRect.copyWith(
+          x: (_startRect.x + dx).clamp(0.0, 1.0 - _startRect.width),
+          y: (_startRect.y + dy).clamp(0.0, 1.0 - _startRect.height),
+        ),
       ),
     );
   }
@@ -781,14 +848,16 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     final startHeight = geometry.availableHeight * _startRect.height;
     final maxWidth = 1.0 - _startRect.x;
     final maxHeight = 1.0 - _startRect.y;
-    _setLiveRect(
-      _startRect.copyWith(
-        width: ((startWidth + localDelta.dx) / geometry.availableWidth)
-            .clamp(math.min(0.02, maxWidth), maxWidth)
-            .toDouble(),
-        height: ((startHeight + localDelta.dy) / geometry.availableHeight)
-            .clamp(math.min(0.02, maxHeight), maxHeight)
-            .toDouble(),
+    _publishNode(
+      _currentNode.copyWith(
+        rect: _startRect.copyWith(
+          width: ((startWidth + localDelta.dx) / geometry.availableWidth)
+              .clamp(math.min(0.02, maxWidth), maxWidth)
+              .toDouble(),
+          height: ((startHeight + localDelta.dy) / geometry.availableHeight)
+              .clamp(math.min(0.02, maxHeight), maxHeight)
+              .toDouble(),
+        ),
       ),
     );
   }
@@ -797,38 +866,37 @@ class _SelectionOverlayState extends State<_SelectionOverlay> {
     final delta = position - _startCenter;
     final angle = math.atan2(delta.dy, delta.dx);
     final degrees = (angle - _startAngle) * 180 / math.pi;
-    _setLiveTransform(
-      _startTransform.copyWith(
-        rotationZ: _normalizeAngle(_startTransform.rotationZ + degrees),
+    _publishNode(
+      _currentNode.copyWith(
+        transform: _startTransform.copyWith(
+          rotationZ: _normalizeAngle(_startTransform.rotationZ + degrees),
+        ),
       ),
     );
   }
 
   void _applyRotate3d(Offset delta) {
-    _setLiveTransform(
-      _startTransform.copyWith(
-        rotationY: _normalizeAngle(
-          _startTransform.rotationY + delta.dx * _dragSensitivity,
-        ),
-        rotationX: _normalizeAngle(
-          _startTransform.rotationX - delta.dy * _dragSensitivity,
+    _publishNode(
+      _currentNode.copyWith(
+        transform: _startTransform.copyWith(
+          rotationY: _normalizeAngle(
+            _startTransform.rotationY + delta.dx * _dragSensitivity,
+          ),
+          rotationX: _normalizeAngle(
+            _startTransform.rotationX - delta.dy * _dragSensitivity,
+          ),
         ),
       ),
     );
   }
 
-  void _setLiveRect(SceneRect rect) {
-    if (rect == _liveRect) {
-      return;
-    }
-    setState(() => _liveRect = rect);
-  }
+  SceneNode get _currentNode => widget.draftNodeListenable.value ?? widget.node;
 
-  void _setLiveTransform(SceneTransform transform) {
-    if (transform == _liveTransform) {
+  void _publishNode(SceneNode node) {
+    if (_sameNodeGeometry(node, _currentNode)) {
       return;
     }
-    setState(() => _liveTransform = transform);
+    widget.onDraftChanged(node);
   }
 }
 

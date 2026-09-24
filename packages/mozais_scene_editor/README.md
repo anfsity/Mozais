@@ -13,7 +13,7 @@ fvm flutter run -d linux
 ```
 
 The editor starts by opening the configured default scene path, or
-`packages/mozais_greeter_ui/lib/themes/default/default.scene.json` from the
+`packages/mozais_theme_default/lib/default.scene.json` from the
 repository root when none is set. **Open** picks a `.scene.json` file through
 the built-in file browser; the path field still accepts a path directly.
 

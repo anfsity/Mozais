@@ -4,13 +4,25 @@ import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mozais_scene/mozais_scene.dart';
-import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart'
+    show
+        AccountPickerSlots,
+        AuthMode,
+        AuthPromptSlots,
+        CatalogMode,
+        GreeterHost,
+        GreeterThemeComponents,
+        GreeterThemeContext,
+        PowerMode,
+        PowerSlots,
+        ServiceMode,
+        ServiceSlots,
+        SessionPickerSlots,
+        ThemeDefinition;
 
 import '../../feature/greeter/greeter_commands.dart';
 import '../../feature/greeter/greeter_effect.dart';
 import '../../feature/greeter/greeter_feature.dart';
-import '../../feature/greeter/greeter_slots.dart';
-import '../../feature/greeter/greeter_state.dart';
 
 /// Maps the current greeter slots onto the scene predicate vocabulary.
 Set<ScenePredicate> activeScenePredicates({

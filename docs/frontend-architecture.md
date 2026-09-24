@@ -59,12 +59,13 @@ a `SceneDocument`, `ThemeBundle`, visual context, or log.
 
 ## 3. Theme and Scene Document
 
-A theme is a directory under `packages/mozais_greeter_ui/lib/themes/<name>/`
+A theme is a build-time Dart package under `packages/mozais_theme_<name>/`
 containing:
 
 - `*.scene.json`: authoring layout and visibility conditions.
 - generated `*.scene.g.dart`: typed Dart emitted by build_runner.
-- `theme.dart`: compile-time assembly of tokens and optional Dart extensions.
+- `theme.dart`: compile-time assembly of tokens and theme-owned components.
+- `assets/`: package-owned images and other bundled resources.
 
 The authoring document is versioned and contains:
 
@@ -99,7 +100,8 @@ closed vocabulary of semantic predicates such as `isDormant` or
 `isAuthPrompting`. A null condition means the node is always present. The
 vocabulary and actions are enumerations over semantic greeter state; arbitrary
 expressions, scripts, runtime-loaded Dart, backend types, and untrusted asset
-paths are not allowed.
+paths are not part of the scene contract. Repository assets use `assets/...`;
+theme-owned Flutter package assets use `packages/<package>/assets/...`.
 
 Production code consumes generated Dart. Runtime JSON parsing is not part of
 the application path.
@@ -120,7 +122,7 @@ instead of each parsing the document format.
 
 ## 4. ThemeDefinition and Selection
 
-`ThemeDefinition` is the greeter-side owner of one theme's identity, generated
+`ThemeDefinition` is the theme package's owner of one theme's identity, generated
 scene document, component assembly, and visual runtime bundle:
 
 ```text
@@ -141,7 +143,13 @@ the theme. Each theme declares its component factory with its scene. A theme
 may explicitly reuse an existing component implementation when the behavior
 and presentation are shared, as the fallback theme currently does.
 
-Theme selection is compile-time:
+The reusable semantic API lives in `mozais_theme_sdk`. It exposes display-safe
+slot listenables and semantic callbacks through `GreeterHost`, without giving a
+theme access to the feature state owner, D-Bus, or backend objects. The greeter
+adapter supplies that Host API to the selected compiled theme.
+
+`mozais_theme_catalog` is the app's compile-time list of built-in themes. Theme
+selection is compile-time:
 
 ```text
 --dart-define=MOZAIS_THEME=default
@@ -151,9 +159,10 @@ Theme selection is compile-time:
 static theme with no blur or continuous animation. An unknown theme name falls
 back to `fallback`; debug builds assert to surface the configuration error.
 
-Theme-specific custom backgrounds and motion implementations are compiled Dart
-extensions registered in `theme.dart`. They are not loaded from external files
-or scripts.
+The app and editor depend on the theme packages selected by the catalog. Theme
+packages contain their own scenes, component assemblies, tokens, and assets;
+their Dart and Flutter code is compiled into the application. Runtime loading of
+new Dart or Flutter code is not supported.
 
 ## 5. SceneRuntime
 

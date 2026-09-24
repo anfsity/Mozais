@@ -5,6 +5,8 @@ import 'package:mozais_theme_sdk/mozais_theme_sdk.dart' show ThemeDefinition;
 import 'components/default_theme_components.dart';
 import 'default.scene.g.dart';
 
+export 'components/default_theme_components.dart' show DefaultThemeComponents;
+
 /// Seed used before extraction runs and when the wallpaper cannot be sampled.
 const _fallbackSeed = Color(0xffb79cff);
 ThemeDefinition buildDefaultTheme({Color? seed, SceneDocument? document}) {

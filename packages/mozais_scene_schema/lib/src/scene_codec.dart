@@ -128,6 +128,7 @@ SceneBackground _decodeBackground(Map<String, dynamic> json) {
   if (asset != null &&
       (asset.contains('..') ||
           (!asset.startsWith('assets/') &&
+              !asset.startsWith('packages/') &&
               kind == SceneBackgroundKind.image))) {
     throw FormatException('Invalid background asset path: $asset');
   }

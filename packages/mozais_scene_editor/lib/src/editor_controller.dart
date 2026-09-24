@@ -2,9 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 import 'package:mozais_scene/mozais_scene.dart';
-import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
+import 'package:mozais_theme_catalog/mozais_theme_catalog.dart';
+import 'package:mozais_theme_sdk/mozais_theme_sdk.dart'
+    show ThemeDefinition, extractSeedFromBytes;
 
 import 'editor_status.dart';
 import 'repo_root.dart';

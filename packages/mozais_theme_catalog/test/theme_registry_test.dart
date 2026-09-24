@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
+import 'package:mozais_theme_catalog/mozais_theme_catalog.dart';
 
 void main() {
   test('builds the default palette from its extracted seed', () {

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
 
 import 'greeter_state.dart';

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
 import 'package:mozais_scene/mozais_scene.dart';
+import 'package:mozais_theme_default/theme.dart';
 
 void main() {
   testWidgets('glass panel uses an opaque Material surface', (tester) async {

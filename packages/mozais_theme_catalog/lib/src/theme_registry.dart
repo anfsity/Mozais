@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:mozais_theme_default/theme.dart' show buildDefaultTheme;
+import 'package:mozais_theme_fallback/theme.dart' show buildFallbackTheme;
 import 'package:mozais_theme_sdk/mozais_theme_sdk.dart';
-
-import '../themes/default/theme.dart';
-import '../themes/fallback/theme.dart';
 
 class ThemeRegistry {
   const ThemeRegistry._();

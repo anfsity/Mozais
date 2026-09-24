@@ -7,7 +7,7 @@
   },
   "background": {
     "kind": "image",
-    "asset": "assets/(139810879)年越し三人娘 『OIOI × 東方Project』.jpg",
+    "asset": "packages/mozais_theme_default/assets/(139810879)年越し三人娘 『OIOI × 東方Project』.jpg",
     "color": "#000000",
     "scrimOpacity": 0.44,
     "blurSigma": 14

@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mozais_greeter_ui/mozais_greeter_ui.dart';
-import 'package:mozais_scene/mozais_scene.dart';
 
 void main() {
   test('builds the default palette from its extracted seed', () {
-    final document = _document(ThemeRegistry.defaultThemeName);
-    final warm = ThemeRegistry.resolveDocument(
-      document,
+    final warm = ThemeRegistry.resolve(
+      ThemeRegistry.defaultThemeName,
       seed: const Color(0xffe53935),
     );
-    final cool = ThemeRegistry.resolveDocument(
-      document,
+    final cool = ThemeRegistry.resolve(
+      ThemeRegistry.defaultThemeName,
       seed: const Color(0xff1e88e5),
     );
 
@@ -24,20 +22,4 @@ void main() {
       isNot(cool.materialTheme.colorScheme.surfaceContainerHigh),
     );
   });
-}
-
-SceneDocument _document(String id) {
-  return SceneDocument(
-    id: id,
-    version: 1,
-    canvas: const SceneCanvas(useSafeArea: false),
-    background: const SceneBackground(kind: SceneBackgroundKind.solid),
-    nodes: const [
-      SceneNode(
-        id: 'panel',
-        kind: SceneNodeKind.glassPanel,
-        rect: SceneRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6),
-      ),
-    ],
-  );
 }

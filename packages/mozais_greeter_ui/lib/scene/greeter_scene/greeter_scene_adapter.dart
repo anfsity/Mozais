@@ -10,7 +10,8 @@ import '../../feature/greeter/greeter_effect.dart';
 import '../../feature/greeter/greeter_feature.dart';
 import '../../feature/greeter/greeter_slots.dart';
 import '../../feature/greeter/greeter_state.dart';
-import 'greeter_widget_catalog.dart';
+import '../../theme/theme_components.dart';
+import '../../theme/theme_definition.dart';
 
 /// Maps the current greeter slots onto the scene predicate vocabulary.
 Set<ScenePredicate> activeScenePredicates({
@@ -58,7 +59,7 @@ class GreeterSceneAdapter extends StatefulWidget {
   });
 
   final GreeterFeature feature;
-  final ThemeBundle theme;
+  final ThemeDefinition theme;
 
   /// Whether the adapter installs the greeter's global key handling.
   ///
@@ -82,14 +83,14 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   late final Listenable _featureSlotChanges;
   late final AnimationController _blurController;
   late Animation<double> _blurAnimation;
-  late GreeterWidgetCatalog _catalog;
+  late GreeterThemeComponents _components;
   late Widget _sceneRuntime;
   late final ValueNotifier<Set<ScenePredicate>> _activeScenePredicates;
 
   @override
   void initState() {
     super.initState();
-    _catalog = _createCatalog();
+    _components = _createComponents();
     _activeScenePredicates = ValueNotifier(_activePredicates());
     _effectSubscription = widget.feature.effects.listen(_handleEffect);
     _featureSlotChanges = Listenable.merge([
@@ -125,33 +126,39 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       }
     }
     if (widget.theme != oldWidget.theme) {
-      _catalog = _createCatalog();
+      _components = _createComponents();
       _blurAnimation = _createBlurAnimation();
       _activeScenePredicates.value = _activePredicates();
       _sceneRuntime = _createSceneRuntime();
     }
   }
 
-  GreeterWidgetCatalog _createCatalog() {
-    return GreeterWidgetCatalog(
-      feature: widget.feature,
-      theme: widget.theme,
-      credentialController: _credentialController,
-      credentialFocusNode: _credentialFocusNode,
-      onDispatch: _dispatch,
-      onRespond: _respondToPrompt,
+  GreeterThemeComponents _createComponents() {
+    return widget.theme.components(
+      GreeterThemeContext(
+        serviceSlots: widget.feature.serviceSlots,
+        authPromptSlots: widget.feature.authPromptSlots,
+        accountPickerSlots: widget.feature.accountPickerSlots,
+        sessionPickerSlots: widget.feature.sessionPickerSlots,
+        powerSlots: widget.feature.powerSlots,
+        tokens: widget.theme.tokens,
+        credentialController: _credentialController,
+        credentialFocusNode: _credentialFocusNode,
+        onDispatch: _dispatch,
+        onRespond: _respondToPrompt,
+      ),
     );
   }
 
   Widget _createSceneRuntime() {
     return SceneRuntime(
       document: widget.theme.document,
-      theme: widget.theme,
+      theme: widget.theme.bundle,
       activePredicates: _activeScenePredicates.value,
       activePredicatesListenable: _activeScenePredicates,
       backgroundBlurSigma: _blurAnimation,
       prewarmHiddenNodes: true,
-      nodeBuilder: _catalog.build,
+      nodeBuilder: _components.build,
     );
   }
 

@@ -63,10 +63,10 @@ class _ScenePreviewState extends State<ScenePreview> {
   SceneDocument? _cachedDocument;
   _ThemeSignature? _themeSignature;
   int _themeRevision = 0;
-  ThemeBundle? _builtTheme;
+  ThemeDefinition? _builtTheme;
   GreeterFeature? _builtFeature;
   Set<ScenePredicate>? _cachedPredicates;
-  ThemeBundle? _cachedTheme;
+  ThemeDefinition? _cachedTheme;
   Widget? _cachedOutlineScene;
   Widget? _cachedRealScene;
   SceneDocument? _outlineDocument;
@@ -383,13 +383,13 @@ class _ScenePreviewState extends State<ScenePreview> {
   Widget _buildScene(
     BuildContext context,
     SceneDocument document,
-    ThemeBundle theme,
+    ThemeDefinition theme,
     PreviewMode mode,
   ) {
     return switch (mode) {
       PreviewMode.outline => SceneRuntime(
         document: document,
-        theme: theme,
+        theme: theme.bundle,
         nodeBuilder: buildPlaceholderNode,
         activePredicates: widget.controller.activePredicates,
       ),

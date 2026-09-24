@@ -23,9 +23,7 @@ void main() {
       ],
     );
     final theme = ThemeBundle(
-      id: 'test',
       tokens: _tokens(),
-      document: document,
       backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
       motions: const {SceneMotionPreset.fade: FadeMotionBuilder()},
     );
@@ -158,9 +156,7 @@ void main() {
       ],
     );
     final theme = ThemeBundle(
-      id: 'test',
       tokens: _tokens(),
-      document: document,
       backgrounds: {SceneBackgroundKind.image: renderer},
     );
 
@@ -267,9 +263,7 @@ void main() {
     final predicates = ValueNotifier<Set<ScenePredicate>>({});
     var buildCount = 0;
     final theme = ThemeBundle(
-      id: 'test',
       tokens: _tokens(),
-      document: document,
       backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
     );
 
@@ -314,9 +308,7 @@ void main() {
       ],
     );
     final theme = ThemeBundle(
-      id: 'test',
       tokens: _tokens(),
-      document: document,
       backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
       motions: const {SceneMotionPreset.fade: FadeMotionBuilder()},
     );
@@ -359,9 +351,7 @@ Widget _runtime(
   bool prewarmHiddenNodes = false,
 }) {
   final theme = ThemeBundle(
-    id: 'test',
     tokens: _tokens(),
-    document: document,
     backgrounds: const {SceneBackgroundKind.solid: SolidBackgroundRenderer()},
   );
   return _runtimeWithTheme(

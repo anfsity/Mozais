@@ -11,19 +11,23 @@ The frontend is split into four cooperating areas:
 
 ```text
 Feature
-  business state, commands, recovery, D-Bus port
+  business state, typed slots, commands, recovery, D-Bus port
         |
         v
 GreeterSceneAdapter
-  maps Greeter slots/effects to SceneRuntime actions
+  maps semantic state to scene predicates and UI actions
+        |
+        v
+ThemeDefinition
+  theme identity, authored scene, component assembly
+        |
+        v
+ThemeBundle
+  visual tokens, background renderers, motion presets
         |
         v
 SceneRuntime
   document layout, layers, transforms, motion lifecycle
-        |
-        v
-ThemeBundle
-  tokens, generated SceneDocument, compiled renderers, motion presets
 ```
 
 `Feature` never knows about a theme, background renderer, blur, motion preset,
@@ -114,16 +118,28 @@ packages/mozais_scene_editor   desktop editor over the same model and runtime
 import. The generator and the editor share the schema's codec and validation
 instead of each parsing the document format.
 
-## 4. ThemeBundle and Theme Selection
+## 4. ThemeDefinition and Selection
 
-`ThemeBundle` combines:
+`ThemeDefinition` is the greeter-side owner of one theme's identity, generated
+scene document, component assembly, and visual runtime bundle:
 
 ```text
-ThemeTokens
-SceneDocument
-BackgroundRenderer registry
-SceneMotionBuilder registry
+ThemeDefinition
+  id
+  SceneDocument
+  GreeterThemeComponents factory
+  ThemeBundle
+    ThemeTokens
+    BackgroundRenderer registry
+    SceneMotionBuilder registry
 ```
+
+`ThemeBundle` contains only visual tokens and renderer registrations. The
+generic `SceneRuntime` receives the authored document, visual bundle, and
+theme-owned node builder as separate inputs; the scene document does not choose
+the theme. Each theme declares its component factory with its scene. A theme
+may explicitly reuse an existing component implementation when the behavior
+and presentation are shared, as the fallback theme currently does.
 
 Theme selection is compile-time:
 
@@ -150,6 +166,12 @@ or scripts.
 - motion component lifecycle, including enter and exit transitions.
 - one repaint boundary per scene node, so each authored visual component paints
   independently from the rest of the scene.
+
+Theme components subscribe to the typed slot that owns their content through
+`SceneRegion` or another local `ListenableBuilder`. `ValueListenableBuilder`
+limits which component subtree rebuilds; the node `RepaintBoundary` limits
+which scene node repaints. Scene predicate notifications are handled by each
+node host, so a visibility change does not rebuild the complete scene tree.
 
 Widgets inside a scene node share that node's paint boundary. Add nested
 boundaries only when profiling shows that a complex child needs independent
@@ -200,13 +222,15 @@ Full-screen animated blur is out of scope.
 ## 7. Greeter Adapter and Slots
 
 `GreeterFeature` exposes typed region slots and commands. `GreeterSceneAdapter`
-binds those slots to a generated `SceneDocument` through a typed widget
-catalog. The catalog preserves ordinary Flutter input, focus, keyboard, and
-accessibility behavior.
+maps display state to scene predicates, selects the `ThemeDefinition`, and
+provides that theme's component assembly with typed slot listenables and UI
+callbacks. Theme components cannot reach the `GreeterFeature` state owner. The
+theme component set maps its own scene nodes to ordinary Flutter widgets,
+preserving native input, focus, keyboard, and accessibility behavior.
 
 The Feature projection contains no `BackgroundSlots`. Visual mood is derived by
 the adapter or theme when a theme explicitly needs it. The credential response
-remains local to the Scene text controller until it is sent as a command.
+remains local to the adapter's text controller until it is sent as a command.
 
 ## 8. Testing Policy
 

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:mozais_scene/mozais_scene.dart';
 
 import '../themes/default/theme.dart';
 import '../themes/fallback/theme.dart';
 import 'palette_extractor.dart';
+import 'theme_definition.dart';
 
 class ThemeRegistry {
   const ThemeRegistry._();
@@ -11,10 +11,9 @@ class ThemeRegistry {
   static const defaultThemeName = 'default';
   static const fallbackThemeName = 'fallback';
 
-  static ThemeBundle resolve(String name, {Color? seed}) {
+  static ThemeDefinition resolve(String name, {Color? seed}) {
     assert(
-      name == defaultThemeName ||
-          name == fallbackThemeName,
+      name == defaultThemeName || name == fallbackThemeName,
       'Unknown MOZAIS_THEME "$name"; falling back to $fallbackThemeName.',
     );
     return switch (name) {
@@ -24,19 +23,11 @@ class ThemeRegistry {
     };
   }
 
-  static ThemeBundle resolveDocument(SceneDocument document, {Color? seed}) {
-    final name = switch (document.id) {
-      fallbackThemeName => fallbackThemeName,
-      _ => defaultThemeName,
-    };
-    return resolve(name, seed: seed).copyWith(document: document);
-  }
-
   /// Samples the theme background for a dynamic palette seed.
   ///
   /// Returns null when the theme has no image background or the asset cannot
   /// be decoded, in which case the caller keeps the built-in seed.
-  static Future<Color?> findBackgroundSeed(ThemeBundle theme) async {
+  static Future<Color?> findBackgroundSeed(ThemeDefinition theme) async {
     final asset = theme.document.background.asset;
     if (asset == null) {
       return null;

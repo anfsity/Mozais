@@ -414,9 +414,13 @@ String _uniqueAssetName(Directory directory, String name) {
 
 /// Resolves the same theme family as the Greeter and points its wallpaper
 /// renderer at repository files that the editor can read directly.
-ThemeBundle editorTheme(SceneDocument document, {Color? seed}) {
-  final resolved = ThemeRegistry.resolveDocument(document, seed: seed);
-  final backgrounds = {...resolved.backgrounds};
+ThemeDefinition editorTheme(SceneDocument document, {Color? seed}) {
+  final themeName = const String.fromEnvironment(
+    'MOZAIS_THEME',
+    defaultValue: ThemeRegistry.defaultThemeName,
+  );
+  final resolved = ThemeRegistry.resolve(themeName, seed: seed);
+  final backgrounds = {...resolved.bundle.backgrounds};
   backgrounds[SceneBackgroundKind.solid] = const SolidBackgroundRenderer();
   backgrounds[SceneBackgroundKind.image] = ImageBackgroundRenderer(
     resolveImage: (asset) {
@@ -426,7 +430,10 @@ ThemeBundle editorTheme(SceneDocument document, {Color? seed}) {
           : AssetImage(asset);
     },
   );
-  return resolved.copyWith(document: document, backgrounds: backgrounds);
+  return resolved.copyWith(
+    document: document,
+    bundle: resolved.bundle.copyWith(backgrounds: backgrounds),
+  );
 }
 
 Future<Color?> editorBackgroundSeed(SceneDocument document) async {

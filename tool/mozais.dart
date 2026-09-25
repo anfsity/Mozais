@@ -26,16 +26,37 @@ Future<void> main(List<String> arguments) async {
 
     final options = _parseOptions(command, arguments.skip(1).toList());
     final repoRoot = _findRepoRoot();
-    final runDirectory =
-        'build/tool/runs/${DateTime.now().toUtc().microsecondsSinceEpoch}-$pid';
+    final runDirectory = await _createRunDirectory(
+      repoRoot,
+      reserve: !options.dryRun,
+    );
+    final steps = buildStepsFor(
+      command,
+      options.cycles,
+      repoRoot,
+      runDirectory,
+    );
+    final artifactPaths = artifactPathsFor(command, runDirectory);
+    if (options.dryRun) {
+      writeRunPlan(
+        command: command,
+        reportPath: options.reportPath,
+        repoRoot: repoRoot,
+        runDirectory: runDirectory,
+        steps: steps,
+        artifactPaths: artifactPaths,
+      );
+      return;
+    }
+
     exitCode = await runDevCommand(
       command: command,
       format: options.format,
       reportPath: options.reportPath,
       repoRoot: repoRoot,
       runDirectory: runDirectory,
-      steps: buildStepsFor(command, options.cycles, repoRoot, runDirectory),
-      artifactPaths: artifactPathsFor(command, runDirectory),
+      steps: steps,
+      artifactPaths: artifactPaths,
     );
   } on FormatException catch (error) {
     stderr.writeln(error.message);
@@ -61,6 +82,7 @@ Options:
   --format text|json  Select console output format (default: text).
   --report PATH       Write the JSON run report to PATH.
   --cycles COUNT      Measurement cycles for verify-perf (minimum: 3).
+  --dry-run           Print the resolved execution plan as JSON.
   -h, --help          Show command help.''');
     return;
   }
@@ -68,10 +90,10 @@ Options:
   stdout.writeln('Usage: fvm dart run tool/mozais.dart $command [options]');
   if (command == 'verify-perf') {
     stdout.writeln(
-      'Options: --format text|json, --report PATH, --cycles COUNT (minimum: 3).',
+      'Options: --format text|json, --report PATH, --cycles COUNT (minimum: 3), --dry-run.',
     );
   } else {
-    stdout.writeln('Options: --format text|json, --report PATH.');
+    stdout.writeln('Options: --format text|json, --report PATH, --dry-run.');
   }
 }
 
@@ -79,12 +101,22 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
   var format = RunOutputFormat.text;
   var cycles = _minimumPerfCycles;
   String? reportPath;
+  var dryRun = false;
   var formatSeen = false;
   var cyclesSeen = false;
   var reportSeen = false;
+  var dryRunSeen = false;
 
   for (var index = 0; index < arguments.length; index++) {
     final option = arguments[index];
+    if (option == '--dry-run') {
+      if (dryRunSeen) {
+        throw const FormatException('Duplicate --dry-run option.');
+      }
+      dryRunSeen = true;
+      dryRun = true;
+      continue;
+    }
     if (!const {'--format', '--report', '--cycles'}.contains(option)) {
       throw FormatException('Unknown option: $option');
     }
@@ -132,7 +164,49 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
     }
   }
 
-  return _CliOptions(format: format, cycles: cycles, reportPath: reportPath);
+  return _CliOptions(
+    format: format,
+    cycles: cycles,
+    reportPath: reportPath,
+    dryRun: dryRun,
+  );
+}
+
+Future<String> _createRunDirectory(
+  Directory repoRoot, {
+  required bool reserve,
+}) async {
+  final parentPath = _join(repoRoot.path, 'build/tool/runs');
+  if (reserve) {
+    await Directory(parentPath).create(recursive: true);
+  }
+
+  final timestamp = DateTime.now().toUtc().microsecondsSinceEpoch;
+  var collision = 0;
+  while (true) {
+    final runId = collision == 0
+        ? '$timestamp-$pid'
+        : '$timestamp-$pid-$collision';
+    final runDirectory = 'build/tool/runs/$runId';
+    final directory = Directory(_join(repoRoot.path, runDirectory));
+    if (directory.existsSync()) {
+      collision++;
+      continue;
+    }
+    if (!reserve) {
+      return runDirectory;
+    }
+
+    try {
+      await directory.create();
+      return runDirectory;
+    } on FileSystemException {
+      if (!directory.existsSync()) {
+        rethrow;
+      }
+      collision++;
+    }
+  }
 }
 
 Directory _findRepoRoot() {
@@ -162,9 +236,11 @@ class _CliOptions {
     required this.format,
     required this.cycles,
     required this.reportPath,
+    required this.dryRun,
   });
 
   final RunOutputFormat format;
   final int cycles;
   final String? reportPath;
+  final bool dryRun;
 }

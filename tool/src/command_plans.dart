@@ -40,57 +40,47 @@ List<RunStep> buildStepsFor(
           '--',
           '--test-threads=1',
         ], workingDirectory: 'backend'),
-        ..._sceneGenerationSteps(),
-        _step('flutter.analyze', ['fvm', 'flutter', 'analyze']),
-        _step('flutter.test', ['fvm', 'flutter', 'test']),
+        ..._sceneGenerationSteps(repoRoot),
+        _step('flutter.analyze', [..._flutterCommand(repoRoot), 'analyze']),
+        _step('flutter.test', [..._flutterCommand(repoRoot), 'test']),
         _step('scene_schema.analyze', [
-          'fvm',
-          'dart',
+          ..._dartCommand(repoRoot),
           'analyze',
         ], workingDirectory: 'packages/mozais_scene_schema'),
         _step('scene_schema.test', [
-          'fvm',
-          'dart',
+          ..._dartCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/mozais_scene_schema'),
         _step('scene_codegen.analyze', [
-          'fvm',
-          'dart',
+          ..._dartCommand(repoRoot),
           'analyze',
         ], workingDirectory: 'packages/mozais_scene_codegen'),
         _step('scene_codegen.test', [
-          'fvm',
-          'dart',
+          ..._dartCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/mozais_scene_codegen'),
         _step('scene.analyze', [
-          'fvm',
-          'flutter',
+          ..._flutterCommand(repoRoot),
           'analyze',
         ], workingDirectory: 'packages/mozais_scene'),
         _step('scene.test', [
-          'fvm',
-          'flutter',
+          ..._flutterCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/mozais_scene'),
         _step('greeter_ui.analyze', [
-          'fvm',
-          'flutter',
+          ..._flutterCommand(repoRoot),
           'analyze',
         ], workingDirectory: 'packages/mozais_greeter_ui'),
         _step('greeter_ui.test', [
-          'fvm',
-          'flutter',
+          ..._flutterCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/mozais_greeter_ui'),
         _step('scene_editor.analyze', [
-          'fvm',
-          'flutter',
+          ..._flutterCommand(repoRoot),
           'analyze',
         ], workingDirectory: 'packages/mozais_scene_editor'),
         _step('scene_editor.test', [
-          'fvm',
-          'flutter',
+          ..._flutterCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/mozais_scene_editor'),
         _step(
@@ -98,8 +88,7 @@ List<RunStep> buildStepsFor(
           [
             'bash',
             'scripts/debug-dbus.sh',
-            'fvm',
-            'dart',
+            ..._dartCommand(repoRoot),
             'run',
             'tool/dbus_gateway_smoke.dart',
           ],
@@ -109,8 +98,8 @@ List<RunStep> buildStepsFor(
         ),
       ];
     case 'verify-perf':
-      final steps = <RunStep>[..._sceneGenerationSteps()];
-      final flutter = _flutterCommand();
+      final steps = <RunStep>[..._sceneGenerationSteps(repoRoot)];
+      final flutter = _flutterCommand(repoRoot);
       for (var cycle = 1; cycle <= cycles; cycle++) {
         final cycleReport = '$runDirectory/perf/scene_report_$cycle.json';
         steps.add(
@@ -129,7 +118,7 @@ List<RunStep> buildStepsFor(
       }
       steps.add(
         _step('performance.aggregate', [
-          ..._dartCommand(),
+          ..._dartCommand(repoRoot),
           'run',
           'tool/perf/aggregate_perf.dart',
           '--output',
@@ -142,7 +131,7 @@ List<RunStep> buildStepsFor(
       );
       steps.add(
         _step('performance.compare', [
-          ..._dartCommand(),
+          ..._dartCommand(repoRoot),
           'run',
           'tool/perf/compare_perf.dart',
           '--baseline',
@@ -153,13 +142,13 @@ List<RunStep> buildStepsFor(
       );
       return steps;
     case 'generate-scenes':
-      return _sceneGenerationSteps();
+      return _sceneGenerationSteps(repoRoot);
     case 'trace-perf':
       final timeline = '$runDirectory/perf/scene_interactions_timeline.json';
       return [
-        ..._sceneGenerationSteps(),
+        ..._sceneGenerationSteps(repoRoot),
         _step('performance.trace', [
-          ..._flutterCommand(),
+          ..._flutterCommand(repoRoot),
           'drive',
           '-d',
           'linux',
@@ -171,7 +160,7 @@ List<RunStep> buildStepsFor(
           '--target=integration_test/performance/scene_performance_test.dart',
         ]),
         _step('performance.summarize_trace', [
-          ..._dartCommand(),
+          ..._dartCommand(repoRoot),
           'run',
           'tool/perf/summarize_timeline.dart',
           '--input',
@@ -183,16 +172,16 @@ List<RunStep> buildStepsFor(
   }
 }
 
-List<RunStep> _sceneGenerationSteps() {
+List<RunStep> _sceneGenerationSteps(Directory repoRoot) {
   return [
     _step('scenes.generate_default', [
-      ..._dartCommand(),
+      ..._dartCommand(repoRoot),
       'run',
       'build_runner',
       'build',
     ], workingDirectory: 'packages/mozais_theme_default'),
     _step('scenes.generate_fallback', [
-      ..._dartCommand(),
+      ..._dartCommand(repoRoot),
       'run',
       'build_runner',
       'build',
@@ -214,23 +203,29 @@ RunStep _step(
   );
 }
 
-List<String> _flutterCommand() {
+List<String> _flutterCommand(Directory repoRoot) {
   final customFlutter = Platform.environment['MOZAIS_FLUTTER_BIN'];
   return customFlutter == null || customFlutter.isEmpty
       ? ['fvm', 'flutter']
-      : [customFlutter];
+      : [_resolveSdkBinary(customFlutter, repoRoot)];
 }
 
-List<String> _dartCommand() {
+List<String> _dartCommand(Directory repoRoot) {
   final customDart = Platform.environment['MOZAIS_DART_BIN'];
   if (customDart != null && customDart.isNotEmpty) {
-    return [customDart];
+    return [_resolveSdkBinary(customDart, repoRoot)];
   }
   final customFlutter = Platform.environment['MOZAIS_FLUTTER_BIN'];
   if (customFlutter != null && customFlutter.isNotEmpty) {
-    return [_join(File(customFlutter).absolute.parent.path, 'dart')];
+    final flutterPath = _resolveSdkBinary(customFlutter, repoRoot);
+    return [_join(File(flutterPath).parent.path, 'dart')];
   }
   return ['fvm', 'dart'];
+}
+
+String _resolveSdkBinary(String binary, Directory repoRoot) {
+  final file = File(binary);
+  return file.isAbsolute ? binary : _join(repoRoot.path, binary);
 }
 
 Map<String, String> artifactPathsFor(String command, String runDirectory) {

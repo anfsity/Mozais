@@ -10,7 +10,7 @@ const _base = Color(0xff0d151a);
 const _surface = Color(0xff1a242a);
 const _surfaceVariant = Color(0xff26343c);
 
-ThemeDefinition buildFallbackTheme() {
+ThemeDefinition buildFallbackTheme({Color? seed}) {
   final colorScheme =
       ColorScheme.fromSeed(
         seedColor: _accent,

@@ -3,13 +3,20 @@
 Run project checks through the Dart tool entry point:
 
 ```sh
+fvm dart run tool/mozais.dart build
 fvm dart run tool/mozais.dart verify
 fvm dart run tool/mozais.dart verify-perf
 fvm dart run tool/mozais.dart generate-scenes
 fvm dart run tool/mozais.dart trace-perf
 ```
 
-The `scripts/verify.sh`, `scripts/verify-perf.sh`, `scripts/generate-scenes.sh`,
+`build` is the theme composition entry point. It discovers every local
+`mozais_theme_*` package, regenerates the catalog and scene sources, resolves
+package dependencies, and builds the Linux Flutter application. A new theme
+package only needs to follow the [theme package contract](theme-package.md).
+
+The `scripts/build.sh`, `scripts/verify.sh`, `scripts/verify-perf.sh`,
+`scripts/generate-scenes.sh`,
 and `scripts/trace-perf-builds.sh` commands remain as shell entry points for
 existing workflows. They delegate to the Dart CLI. Shell scripts continue to
 own toolchain setup and Linux session work such as private D-Bus and Sway.

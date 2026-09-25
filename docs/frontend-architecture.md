@@ -151,11 +151,13 @@ slot listenables and semantic callbacks through `GreeterHost`, without giving a
 theme access to the feature state owner, D-Bus, or backend objects. The greeter
 adapter supplies that Host API to the selected compiled theme.
 
-`mozais_theme_catalog` is the executable's compile-time list of themes. It is a
-composition-root dependency, not a dependency of the theme SDK or of another
-theme. A theme package can be developed and tested independently, then added to
-an application catalog as a normal Dart package dependency. Theme selection is
-compile-time:
+`mozais_theme_catalog` is the executable's generated compile-time catalog. It
+is a composition-root dependency, not a dependency of the theme SDK or of
+another theme. The `build` command discovers local `mozais_theme_*` packages,
+updates the catalog's generated dependency block, and emits the registry from
+the package naming and `lib/theme.dart` entrypoint conventions. A theme package
+can be developed and tested independently without editing the catalog. Theme
+selection is compile-time:
 
 ```text
 --dart-define=MOZAIS_THEME=default

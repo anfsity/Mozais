@@ -1,14 +1,46 @@
 import 'dart:io';
 
 import 'run_report.dart';
+import 'theme_catalog.dart';
 
 List<RunStep> buildStepsFor(
   String command,
   int cycles,
   Directory repoRoot,
-  String runDirectory,
-) {
+  String runDirectory, {
+  String buildTarget = 'linux',
+  String? buildMode,
+}) {
   switch (command) {
+    case 'build':
+      final themes = findThemePackages(repoRoot);
+      return [
+        _step('themes.catalog.generate', [
+          ..._dartCommand(repoRoot),
+          'run',
+          'tool/theme_catalog.dart',
+          '--write',
+        ]),
+        _step('themes.catalog.pub_get', [
+          ..._flutterCommand(repoRoot),
+          'pub',
+          'get',
+        ], workingDirectory: 'packages/mozais_theme_catalog'),
+        _step('app.pub_get', [..._flutterCommand(repoRoot), 'pub', 'get']),
+        for (final theme in themes)
+          _step('themes.pub_get_${theme.packageName}', [
+            ..._flutterCommand(repoRoot),
+            'pub',
+            'get',
+          ], workingDirectory: theme.relativePath),
+        ..._sceneGenerationSteps(repoRoot, themes),
+        _step('flutter.build_$buildTarget', [
+          ..._flutterCommand(repoRoot),
+          'build',
+          buildTarget,
+          if (buildMode != null) '--$buildMode',
+        ]),
+      ];
     case 'verify':
       return [
         _step('toolchain.check', ['bash', 'scripts/check-toolchain.sh']),
@@ -172,56 +204,20 @@ List<RunStep> buildStepsFor(
   }
 }
 
-List<RunStep> _sceneGenerationSteps(Directory repoRoot) {
+List<RunStep> _sceneGenerationSteps(
+  Directory repoRoot, [
+  List<ThemePackage>? themes,
+]) {
+  final discoveredThemes = themes ?? findThemePackages(repoRoot);
   return [
-    for (final package in _themePackages(repoRoot))
-      _step('scenes.generate_${_packageName(package)}', [
+    for (final theme in discoveredThemes)
+      _step('scenes.generate_${theme.packageName}', [
         ..._dartCommand(repoRoot),
         'run',
         'build_runner',
         'build',
-      ], workingDirectory: _relativePackagePath(package)),
+      ], workingDirectory: theme.relativePath),
   ];
-}
-
-/// Finds theme packages by their authored scene documents.
-///
-/// The builder should not need a new command-plan entry whenever a theme is
-/// added. Packages without a scene document, such as the SDK and catalog, are
-/// infrastructure and are intentionally excluded.
-List<Directory> _themePackages(Directory repoRoot) {
-  final packages = Directory(_join(repoRoot.path, 'packages'));
-  if (!packages.existsSync()) {
-    return const [];
-  }
-  final themes =
-      packages.listSync(followLinks: false).whereType<Directory>().where((
-        directory,
-      ) {
-        final name = _packageName(directory);
-        if (!name.startsWith('mozais_theme_')) {
-          return false;
-        }
-        final lib = Directory(_join(directory.path, 'lib'));
-        if (!lib.existsSync()) {
-          return false;
-        }
-        return lib
-            .listSync(recursive: true, followLinks: false)
-            .whereType<File>()
-            .any((file) => file.path.endsWith('.scene.json'));
-      }).toList()..sort(
-        (left, right) => _packageName(left).compareTo(_packageName(right)),
-      );
-  return themes;
-}
-
-String _packageName(Directory directory) {
-  return directory.path.split(Platform.pathSeparator).last;
-}
-
-String _relativePackagePath(Directory directory) {
-  return 'packages/${_packageName(directory)}';
 }
 
 RunStep _step(

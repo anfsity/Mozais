@@ -3,7 +3,13 @@ import 'dart:io';
 import 'src/command_plans.dart';
 import 'src/run_report.dart';
 
-const _commands = {'verify', 'verify-perf', 'generate-scenes', 'trace-perf'};
+const _commands = {
+  'build',
+  'verify',
+  'verify-perf',
+  'generate-scenes',
+  'trace-perf',
+};
 const _minimumPerfCycles = 3;
 
 Future<void> main(List<String> arguments) async {
@@ -35,6 +41,8 @@ Future<void> main(List<String> arguments) async {
       options.cycles,
       repoRoot,
       runDirectory,
+      buildTarget: options.buildTarget,
+      buildMode: options.buildMode,
     );
     final artifactPaths = artifactPathsFor(command, runDirectory);
     if (options.dryRun) {
@@ -73,6 +81,7 @@ void _writeUsage([String? command]) {
     stdout.writeln('''Usage: fvm dart run tool/mozais.dart <command> [options]
 
 Commands:
+  build           Discover themes, generate sources, and build the Flutter app.
   verify          Run the full backend, Dart, Flutter, and D-Bus verification.
   verify-perf     Run the Linux profile performance gate.
   generate-scenes Generate generated theme scene code.
@@ -82,13 +91,19 @@ Options:
   --format text|json  Select console output format (default: text).
   --report PATH       Write the JSON run report to PATH.
   --cycles COUNT      Measurement cycles for verify-perf (minimum: 3).
+  --platform NAME     Flutter build target for build (default: linux).
+  --mode MODE         Flutter build mode: debug, profile, or release.
   --dry-run           Print the resolved execution plan as JSON.
   -h, --help          Show command help.''');
     return;
   }
 
   stdout.writeln('Usage: fvm dart run tool/mozais.dart $command [options]');
-  if (command == 'verify-perf') {
+  if (command == 'build') {
+    stdout.writeln(
+      'Options: --platform NAME, --mode debug|profile|release, --format text|json, --report PATH, --dry-run.',
+    );
+  } else if (command == 'verify-perf') {
     stdout.writeln(
       'Options: --format text|json, --report PATH, --cycles COUNT (minimum: 3), --dry-run.',
     );
@@ -100,12 +115,16 @@ Options:
 _CliOptions _parseOptions(String command, List<String> arguments) {
   var format = RunOutputFormat.text;
   var cycles = _minimumPerfCycles;
+  var buildTarget = 'linux';
+  String? buildMode;
   String? reportPath;
   var dryRun = false;
   var formatSeen = false;
   var cyclesSeen = false;
   var reportSeen = false;
   var dryRunSeen = false;
+  var buildTargetSeen = false;
+  var buildModeSeen = false;
 
   for (var index = 0; index < arguments.length; index++) {
     final option = arguments[index];
@@ -117,7 +136,13 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
       dryRun = true;
       continue;
     }
-    if (!const {'--format', '--report', '--cycles'}.contains(option)) {
+    if (!const {
+      '--format',
+      '--report',
+      '--cycles',
+      '--platform',
+      '--mode',
+    }.contains(option)) {
       throw FormatException('Unknown option: $option');
     }
     if (index + 1 >= arguments.length ||
@@ -159,6 +184,30 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
           );
         }
         cycles = parsedCycles;
+      case '--platform':
+        if (command != 'build') {
+          throw const FormatException('--platform is only valid for build.');
+        }
+        if (buildTargetSeen) {
+          throw const FormatException('Duplicate --platform option.');
+        }
+        buildTargetSeen = true;
+        if (!RegExp(r'^[a-z][a-z0-9_-]*$').hasMatch(value)) {
+          throw FormatException('Invalid Flutter build target: $value');
+        }
+        buildTarget = value;
+      case '--mode':
+        if (command != 'build') {
+          throw const FormatException('--mode is only valid for build.');
+        }
+        if (buildModeSeen) {
+          throw const FormatException('Duplicate --mode option.');
+        }
+        buildModeSeen = true;
+        if (!const {'debug', 'profile', 'release'}.contains(value)) {
+          throw FormatException('Unknown Flutter build mode: $value');
+        }
+        buildMode = value;
       default:
         throw FormatException('Unknown option: $option');
     }
@@ -167,6 +216,8 @@ _CliOptions _parseOptions(String command, List<String> arguments) {
   return _CliOptions(
     format: format,
     cycles: cycles,
+    buildTarget: buildTarget,
+    buildMode: buildMode,
     reportPath: reportPath,
     dryRun: dryRun,
   );
@@ -235,12 +286,16 @@ class _CliOptions {
   const _CliOptions({
     required this.format,
     required this.cycles,
+    required this.buildTarget,
+    required this.buildMode,
     required this.reportPath,
     required this.dryRun,
   });
 
   final RunOutputFormat format;
   final int cycles;
+  final String buildTarget;
+  final String? buildMode;
   final String? reportPath;
   final bool dryRun;
 }

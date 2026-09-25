@@ -15,6 +15,10 @@ fvm dart run tool/mozais.dart trace-perf
 package dependencies, and builds the Linux Flutter application. A new theme
 package only needs to follow the [theme package contract](theme-package.md).
 
+`verify` analyzes the shared theme SDK, catalog, components, and every discovered
+theme package. It also runs a theme package's Flutter tests when that package
+contains `*_test.dart` files under `test/`.
+
 The `scripts/build.sh`, `scripts/verify.sh`, `scripts/verify-perf.sh`,
 `scripts/generate-scenes.sh`,
 and `scripts/trace-perf-builds.sh` commands remain as shell entry points for

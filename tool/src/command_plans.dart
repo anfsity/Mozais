@@ -42,6 +42,7 @@ List<RunStep> buildStepsFor(
         ]),
       ];
     case 'verify':
+      final themes = findThemePackages(repoRoot);
       return [
         _step('toolchain.check', ['bash', 'scripts/check-toolchain.sh']),
         _step('backend.format', [
@@ -72,7 +73,7 @@ List<RunStep> buildStepsFor(
           '--',
           '--test-threads=1',
         ], workingDirectory: 'backend'),
-        ..._sceneGenerationSteps(repoRoot),
+        ..._sceneGenerationSteps(repoRoot, themes),
         _step('flutter.analyze', [..._flutterCommand(repoRoot), 'analyze']),
         _step('flutter.test', [..._flutterCommand(repoRoot), 'test']),
         _step('scene_schema.analyze', [
@@ -115,6 +116,7 @@ List<RunStep> buildStepsFor(
           ..._flutterCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/mozais_scene_editor'),
+        ..._getThemeVerificationSteps(repoRoot, themes),
         _step(
           'dbus.smoke',
           [
@@ -217,6 +219,51 @@ List<RunStep> _sceneGenerationSteps(
         'build_runner',
         'build',
       ], workingDirectory: theme.relativePath),
+  ];
+}
+
+List<RunStep> _getThemeVerificationSteps(
+  Directory repoRoot,
+  List<ThemePackage> themes,
+) {
+  final packageNames = [
+    'mozais_greeter_components',
+    'mozais_theme_sdk',
+    'mozais_theme_catalog',
+    ...themes.map((theme) => theme.packageName),
+  ];
+  return [
+    for (final packageName in packageNames)
+      ..._getFlutterPackageVerificationSteps(repoRoot, packageName),
+  ];
+}
+
+List<RunStep> _getFlutterPackageVerificationSteps(
+  Directory repoRoot,
+  String packageName,
+) {
+  final workingDirectory = 'packages/$packageName';
+  final testDirectory = Directory(
+    _join(repoRoot.path, '$workingDirectory/test'),
+  );
+  final hasTests =
+      testDirectory.existsSync() &&
+      testDirectory
+          .listSync(recursive: true, followLinks: false)
+          .whereType<File>()
+          .any((file) => file.path.endsWith('_test.dart'));
+  final flutter = _flutterCommand(repoRoot);
+
+  return [
+    _step('$packageName.analyze', [
+      ...flutter,
+      'analyze',
+    ], workingDirectory: workingDirectory),
+    if (hasTests)
+      _step('$packageName.test', [
+        ...flutter,
+        'test',
+      ], workingDirectory: workingDirectory),
   ];
 }
 

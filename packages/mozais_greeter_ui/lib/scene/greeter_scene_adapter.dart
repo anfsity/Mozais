@@ -18,9 +18,9 @@ import 'package:mozais_theme_sdk/mozais_theme_sdk.dart'
         SessionPickerSlots,
         ThemeDefinition;
 
-import '../../feature/greeter/greeter_commands.dart';
-import '../../feature/greeter/greeter_effect.dart';
-import '../../feature/greeter/greeter_feature.dart';
+import '../feature/greeter_commands.dart';
+import '../feature/greeter_effect.dart';
+import '../feature/greeter_feature.dart';
 
 /// Maps the current greeter slots onto the scene predicate vocabulary.
 Set<ScenePredicate> activeScenePredicates({

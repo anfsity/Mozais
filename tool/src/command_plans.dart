@@ -174,19 +174,54 @@ List<RunStep> buildStepsFor(
 
 List<RunStep> _sceneGenerationSteps(Directory repoRoot) {
   return [
-    _step('scenes.generate_default', [
-      ..._dartCommand(repoRoot),
-      'run',
-      'build_runner',
-      'build',
-    ], workingDirectory: 'packages/mozais_theme_default'),
-    _step('scenes.generate_fallback', [
-      ..._dartCommand(repoRoot),
-      'run',
-      'build_runner',
-      'build',
-    ], workingDirectory: 'packages/mozais_theme_fallback'),
+    for (final package in _themePackages(repoRoot))
+      _step('scenes.generate_${_packageName(package)}', [
+        ..._dartCommand(repoRoot),
+        'run',
+        'build_runner',
+        'build',
+      ], workingDirectory: _relativePackagePath(package)),
   ];
+}
+
+/// Finds theme packages by their authored scene documents.
+///
+/// The builder should not need a new command-plan entry whenever a theme is
+/// added. Packages without a scene document, such as the SDK and catalog, are
+/// infrastructure and are intentionally excluded.
+List<Directory> _themePackages(Directory repoRoot) {
+  final packages = Directory(_join(repoRoot.path, 'packages'));
+  if (!packages.existsSync()) {
+    return const [];
+  }
+  final themes =
+      packages.listSync(followLinks: false).whereType<Directory>().where((
+        directory,
+      ) {
+        final name = _packageName(directory);
+        if (!name.startsWith('mozais_theme_')) {
+          return false;
+        }
+        final lib = Directory(_join(directory.path, 'lib'));
+        if (!lib.existsSync()) {
+          return false;
+        }
+        return lib
+            .listSync(recursive: true, followLinks: false)
+            .whereType<File>()
+            .any((file) => file.path.endsWith('.scene.json'));
+      }).toList()..sort(
+        (left, right) => _packageName(left).compareTo(_packageName(right)),
+      );
+  return themes;
+}
+
+String _packageName(Directory directory) {
+  return directory.path.split(Platform.pathSeparator).last;
+}
+
+String _relativePackagePath(Directory directory) {
+  return 'packages/${_packageName(directory)}';
 }
 
 RunStep _step(

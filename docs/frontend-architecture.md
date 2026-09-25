@@ -114,6 +114,7 @@ packages/mozais_scene_schema   Flutter-free model, condition evaluator, JSON cod
 packages/mozais_scene          runtime, theme bundle, background and motion registries
 packages/mozais_scene_codegen  build_runner generator that decodes JSON and emits Dart
 packages/mozais_scene_editor   desktop editor over the same model and runtime
+packages/mozais_greeter_components optional reusable semantic component set
 ```
 
 `mozais_scene` re-exports the schema, so application code keeps a single
@@ -150,8 +151,11 @@ slot listenables and semantic callbacks through `GreeterHost`, without giving a
 theme access to the feature state owner, D-Bus, or backend objects. The greeter
 adapter supplies that Host API to the selected compiled theme.
 
-`mozais_theme_catalog` is the app's compile-time list of built-in themes. Theme
-selection is compile-time:
+`mozais_theme_catalog` is the executable's compile-time list of themes. It is a
+composition-root dependency, not a dependency of the theme SDK or of another
+theme. A theme package can be developed and tested independently, then added to
+an application catalog as a normal Dart package dependency. Theme selection is
+compile-time:
 
 ```text
 --dart-define=MOZAIS_THEME=default
@@ -161,10 +165,11 @@ selection is compile-time:
 static theme with no blur or continuous animation. An unknown theme name falls
 back to `fallback`; debug builds assert to surface the configuration error.
 
-The app and editor depend on the theme packages selected by the catalog. Theme
-packages contain their own scenes, component assemblies, tokens, and assets;
-their Dart and Flutter code is compiled into the application. Runtime loading of
-new Dart or Flutter code is not supported.
+The app and editor depend on the theme packages selected by the catalog. Each
+theme package owns its scenes, component assembly, tokens, and assets. A theme
+may depend on SDK or explicitly shared component packages, but one theme must
+not import another theme package. Its Dart and Flutter code is compiled into
+the application; runtime loading of new Dart or Flutter code is not supported.
 
 ## 5. SceneRuntime
 

@@ -7,8 +7,8 @@ import 'session_component.dart';
 import 'status_component.dart';
 import 'system_components.dart';
 
-class DefaultThemeComponents implements GreeterThemeComponents {
-  const DefaultThemeComponents(this.theme);
+class StandardGreeterComponents implements GreeterThemeComponents {
+  const StandardGreeterComponents(this.theme);
 
   final GreeterThemeContext theme;
 

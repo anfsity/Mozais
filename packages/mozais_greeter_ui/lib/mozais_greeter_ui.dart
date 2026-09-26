@@ -1,8 +1,7 @@
 /// The reusable Mozais greeter UI: feature and scene composition.
 ///
-/// This library has no backend dependency. The app supplies a
-/// `GreeterGateway` and a `SessionStore`; the editor supplies a demo gateway
-/// and an in-memory document.
+/// This library has no backend dependency. The executable or a development
+/// host supplies a `GreeterGateway` and a `SessionStore`.
 library;
 
 export 'feature/greeter_commands.dart';

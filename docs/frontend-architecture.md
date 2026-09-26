@@ -113,13 +113,12 @@ Flutter:
 packages/mozais_scene_schema   Flutter-free model, condition evaluator, JSON codec
 packages/mozais_scene          runtime, theme bundle, background and motion registries
 packages/mozais_scene_codegen  build_runner generator that decodes JSON and emits Dart
-packages/mozais_scene_editor   desktop editor over the same model and runtime
 packages/mozais_greeter_components optional reusable semantic component set
 ```
 
 `mozais_scene` re-exports the schema, so application code keeps a single
-import. The generator and the editor share the schema's codec and validation
-instead of each parsing the document format.
+import. Scene build tooling uses the schema's codec and validation as the
+authoritative implementation for parsing scene documents.
 
 ## 4. ThemeDefinition and Selection
 
@@ -167,11 +166,12 @@ selection is compile-time:
 static theme with no blur or continuous animation. An unknown theme name falls
 back to `fallback`; debug builds assert to surface the configuration error.
 
-The app and editor depend on the theme packages selected by the catalog. Each
-theme package owns its scenes, component assembly, tokens, and assets. A theme
-may depend on SDK or explicitly shared component packages, but one theme must
-not import another theme package. Its Dart and Flutter code is compiled into
-the application; runtime loading of new Dart or Flutter code is not supported.
+The greeter executable depends on the theme packages selected by the catalog.
+Each theme package owns its scenes, component assembly, tokens, and assets. A
+theme may depend on SDK or explicitly shared component packages, but one theme
+must not import another theme package. Its Dart and Flutter code is compiled
+into the application; runtime loading of new Dart or Flutter code is not
+supported.
 
 ## 5. SceneRuntime
 
@@ -305,5 +305,3 @@ directory.
 4. Add the default and fallback themes.
 5. Replace layout assertions with interaction coverage.
 6. Add the separate profile performance suite.
-7. Build the scene editor as a tool on the same model and runtime
-   (`packages/mozais_scene_editor`).

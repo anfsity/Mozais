@@ -108,14 +108,6 @@ List<RunStep> buildStepsFor(
           ..._flutterCommand(repoRoot),
           'test',
         ], workingDirectory: 'packages/mozais_greeter_ui'),
-        _step('scene_editor.analyze', [
-          ..._flutterCommand(repoRoot),
-          'analyze',
-        ], workingDirectory: 'packages/mozais_scene_editor'),
-        _step('scene_editor.test', [
-          ..._flutterCommand(repoRoot),
-          'test',
-        ], workingDirectory: 'packages/mozais_scene_editor'),
         ..._getThemeVerificationSteps(repoRoot, themes),
         _step(
           'dbus.smoke',

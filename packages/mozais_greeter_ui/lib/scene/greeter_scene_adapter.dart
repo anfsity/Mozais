@@ -62,26 +62,11 @@ class GreeterSceneAdapter extends StatefulWidget {
   const GreeterSceneAdapter({
     required this.feature,
     required this.theme,
-    this.handleKeyboard = true,
-    this.exitOnHandoff = true,
-    this.draft,
     super.key,
   });
 
   final GreeterFeature feature;
   final ThemeDefinition theme;
-
-  /// Whether the adapter installs the greeter's global key handling.
-  ///
-  /// A host that embeds the greeter beside its own text fields, such as the
-  /// scene editor, sets this false so keystrokes are not captured.
-  final bool handleKeyboard;
-
-  /// Whether a successful session start closes the host application.
-  final bool exitOnHandoff;
-
-  /// Supplies transient geometry for one node while an editor gesture runs.
-  final SceneNodeDraft? draft;
 
   @override
   State<GreeterSceneAdapter> createState() => _GreeterSceneAdapterState();
@@ -111,21 +96,12 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
     _scene = _createScene();
     // Key handling must not depend on the focus chain: the credential field
     // is disabled between attempts, which drops focus to the root scope.
-    if (widget.handleKeyboard) {
-      FocusManager.instance.addEarlyKeyEventHandler(_handleKeyEvent);
-    }
+    FocusManager.instance.addEarlyKeyEventHandler(_handleKeyEvent);
   }
 
   @override
   void didUpdateWidget(GreeterSceneAdapter oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.handleKeyboard != oldWidget.handleKeyboard) {
-      if (widget.handleKeyboard) {
-        FocusManager.instance.addEarlyKeyEventHandler(_handleKeyEvent);
-      } else {
-        FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
-      }
-    }
     final featureChanged = !identical(widget.feature, oldWidget.feature);
     if (featureChanged) {
       _stopListeningToFeature(oldWidget.feature);
@@ -135,9 +111,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       _credentialFocusNode.unfocus();
       _wakeController.value = widget.feature.dormantSlots.value ? 0 : 1;
     }
-    if (featureChanged ||
-        widget.theme != oldWidget.theme ||
-        widget.draft != oldWidget.draft) {
+    if (featureChanged || widget.theme != oldWidget.theme) {
       _activeScenePredicates.value = _activePredicates();
       _scene = _createScene();
     }
@@ -185,15 +159,12 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
       activePredicates: _activeScenePredicates.value,
       activePredicatesListenable: _activeScenePredicates,
       wakeProgress: _wakeController,
-      draft: widget.draft,
     );
   }
 
   @override
   void dispose() {
-    if (widget.handleKeyboard) {
-      FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
-    }
+    FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
     _stopListeningToFeature(widget.feature);
     _activeScenePredicates.dispose();
     _wakeController.dispose();
@@ -205,7 +176,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
   @override
   Widget build(BuildContext context) {
     return Focus(
-      autofocus: widget.handleKeyboard,
+      autofocus: true,
       child: Listener(
         behavior: HitTestBehavior.translucent,
         onPointerDown: (_) {
@@ -406,9 +377,7 @@ class _GreeterSceneAdapterState extends State<GreeterSceneAdapter>
           );
         });
       case ExitAfterHandoffEffect():
-        if (widget.exitOnHandoff) {
-          unawaited(SystemNavigator.pop());
-        }
+        unawaited(SystemNavigator.pop());
     }
   }
 }

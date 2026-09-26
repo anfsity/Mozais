@@ -100,7 +100,6 @@ void main() {
               (step['id'] as String).startsWith('scene_codegen.') ||
               (step['id'] as String).startsWith('scene.') ||
               (step['id'] as String).startsWith('greeter_ui.') ||
-              (step['id'] as String).startsWith('scene_editor.') ||
               (step['id'] as String).startsWith('flutter.') ||
               (step['id'] as String) == 'dbus.smoke')
             step['id'] as String: (step['command'] as List).cast<String>(),
@@ -123,8 +122,7 @@ void main() {
               (entry) =>
                   entry.key.startsWith('flutter.') ||
                   entry.key.startsWith('scene.') ||
-                  entry.key.startsWith('greeter_ui.') ||
-                  entry.key.startsWith('scene_editor.'),
+                  entry.key.startsWith('greeter_ui.'),
             )
             .every((entry) => entry.value.first == flutterBin),
         isTrue,

@@ -6,4 +6,4 @@ repo_root="$(cd -- "$script_dir/.." && pwd)"
 # shellcheck source=lib.sh
 source "$script_dir/lib.sh"
 
-mozais_run_dev_cli "$repo_root" generate-scenes "$@"
+mozais_run_dev_cli "$repo_root" build "$@"
